@@ -1,4 +1,4 @@
-import { syncData, saveAndRefresh, backupToGoogleSheet } from "./firebase-service.js";
+import { syncData, saveAndRefresh } from './firebase-service.js';
 import { dataState, globalState, loadFromLocalStorage, updateLocalState } from "./state.js";
 import { refreshUI, renderScoreRoster, renderAttRoster, renderGradeReport, updateScanTaskDropdown, renderStudentDashboard, renderConfigSlots, renderTaskClassCheckboxes, renderTaskChapterCheckboxes, renderIncomingSubmissions, renderAdminMaterials } from "./ui-render.js";
 import { getThaiDateISO, formatThaiDate, calGrade, showToast, showLoading, hideLoading, calculateScores } from "./utils.js";
@@ -631,3 +631,4 @@ window.addEventListener('DOMContentLoaded', () => {
         banner.classList.add('hidden'); globalState.smartClassId = null; 
     }, 60000);
 });
+
