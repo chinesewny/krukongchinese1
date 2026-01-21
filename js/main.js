@@ -455,7 +455,7 @@ function initEventListeners() {
             document.getElementById('admin-login-wrapper').classList.add('hidden'); 
             document.getElementById('admin-content-wrapper').classList.remove('hidden'); 
             refreshUI();
-        } else alert("รหัสผิด (Demo: ลองกด Login เลย หรือใช้ user:admin pass:1234)"); 
+        } else alert("รหัสผ่านไม่ถูกต้อง"); 
     };
     
     document.getElementById('form-task').onsubmit = (e) => { 
@@ -631,4 +631,5 @@ window.addEventListener('DOMContentLoaded', () => {
         banner.classList.add('hidden'); globalState.smartClassId = null; 
     }, 60000);
 });
+
 
