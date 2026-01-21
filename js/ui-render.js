@@ -1,5 +1,6 @@
 // js/ui-render.js
-import { dataState, globalState, saveAndRefresh } from "./state.js";
+import { dataState, globalState } from "./state.js";
+import { saveAndRefresh } from "./firebase-service.js";
 import { calculateScores } from "./main.js"; // ต้องย้าย calculateScores มาไว้ main หรือ utils (ผมแนะนำไว้ main เพื่อความง่ายในการเรียกใช้ข้ามไฟล์)
 import { calGrade, formatThaiDate, getThaiDateISO, showToast } from "./utils.js";
 
@@ -57,5 +58,6 @@ export function renderIncomingSubmissions() { /* ... code ... */ }
 export function renderAdminMaterials() { /* ... code ... */ }
 export function renderStudentDashboard(code) { /* ... code ... */ }
 export function updateScanTaskDropdown() { /* ... code ... */ }
+
 
 // ... คัดลอกฟังก์ชัน render ทั้งหมดมาวางที่นี่ ...
