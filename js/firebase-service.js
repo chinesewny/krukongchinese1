@@ -4,7 +4,7 @@ import { getDatabase, ref, set, onValue } from "https://www.gstatic.com/firebase
 import { FIREBASE_CONFIG, GOOGLE_SCRIPT_URL } from "./config.js";
 import { dataState, updateDataState, updateLocalState, saveToLocalStorage, loadFromLocalStorage, globalState } from "./state.js";
 import { updateSyncUI, showToast, showLoading, hideLoading } from "./utils.js";
-import { refreshUI } from "./ui-render.js"; // จะสร้างไฟล์นี้ในขั้นถัดไป
+import { refreshUI } from "./ui-render.js";
 
 // Initialize Firebase
 const app = initializeApp(FIREBASE_CONFIG);
@@ -121,41 +121,35 @@ async function processSheetQueue() {
         processSheetQueue();
     } else {
         updateSyncUI('Online (All Synced)', 'green');
-    // Append this to the end of js/firebase-service.js
+    }
+}
 
+// ฟังก์ชันสำหรับ Backup ข้อมูลทั้งหมดไปยัง Google Sheet
 export async function backupToGoogleSheet() {
-    // 1. UI Feedback
     showLoading("Backing up to Sheet...");
     updateSyncUI('Backing up...', 'yellow');
 
     try {
-        // 2. Prepare payload with all current data
         const payload = {
-            action: 'backup', // Ensure your Google Apps Script handles this action
+            action: 'backup',
             data: dataState,
             timestamp: new Date().toISOString()
         };
 
-        // 3. Send to Google Apps Script
         await fetch(GOOGLE_SCRIPT_URL, {
             method: 'POST',
             body: JSON.stringify(payload)
         });
 
-        // 4. Success handling
         console.log("✅ Manual Backup Success");
         updateSyncUI('Online (Backed Up)', 'green');
         showToast("Backup successful!", "bg-green-600");
 
     } catch (error) {
-        // 5. Error handling
         console.error("❌ Backup Failed:", error);
         updateSyncUI('Backup Failed', 'red');
         showToast("Backup failed. Check console.", "bg-red-600");
     } finally {
         hideLoading();
     }
-}
-    }
-
 }
