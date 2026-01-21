@@ -121,5 +121,41 @@ async function processSheetQueue() {
         processSheetQueue();
     } else {
         updateSyncUI('Online (All Synced)', 'green');
+    // Append this to the end of js/firebase-service.js
+
+export async function backupToGoogleSheet() {
+    // 1. UI Feedback
+    showLoading("Backing up to Sheet...");
+    updateSyncUI('Backing up...', 'yellow');
+
+    try {
+        // 2. Prepare payload with all current data
+        const payload = {
+            action: 'backup', // Ensure your Google Apps Script handles this action
+            data: dataState,
+            timestamp: new Date().toISOString()
+        };
+
+        // 3. Send to Google Apps Script
+        await fetch(GOOGLE_SCRIPT_URL, {
+            method: 'POST',
+            body: JSON.stringify(payload)
+        });
+
+        // 4. Success handling
+        console.log("✅ Manual Backup Success");
+        updateSyncUI('Online (Backed Up)', 'green');
+        showToast("Backup successful!", "bg-green-600");
+
+    } catch (error) {
+        // 5. Error handling
+        console.error("❌ Backup Failed:", error);
+        updateSyncUI('Backup Failed', 'red');
+        showToast("Backup failed. Check console.", "bg-red-600");
+    } finally {
+        hideLoading();
     }
+}
+    }
+
 }
