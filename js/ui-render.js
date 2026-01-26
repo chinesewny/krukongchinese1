@@ -20,6 +20,8 @@ function refreshDropdowns() {
     setOpts('sch-class', dataState.classes); 
     setOpts('report-subject', dataState.subjects); 
     setOpts('exam-class-select', dataState.classes);
+    setOpts('task-subject-accum', dataState.subjects); // สำหรับฟอร์มงานเก็บคะแนน
+    setOpts('task-subject-exam', dataState.subjects);  // สำหรับฟอร์มสอบ
 }
 
 function updateInboxBadge() { 
@@ -539,4 +541,5 @@ export function refreshUI() {
          if(code) { renderStudentDashboard(code); }
     }
 }
+
 
