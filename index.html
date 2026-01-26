@@ -98,51 +98,77 @@
                      <h4 class="text-sm font-bold text-white mb-4 uppercase tracking-wider border-b border-white/10 pb-2 flex justify-between items-center"><span>⚙️ ตั้งค่าคะแนนรายวิชา</span><span class="text-[10px] text-white/50">คลิกที่วิชาเพื่อแก้ไข</span></h4>
                      <div id="subject-list-container" class="flex-1 overflow-y-auto space-y-2 pr-1"></div>
                  </div>
-<div class="flex flex-col gap-6 mt-6">
+<div class="flex flex-col gap-6 mt-6 no-print">
     
     <div class="bg-white/5 p-5 rounded-2xl border border-white/10 relative overflow-hidden h-fit shadow-lg">
-        <div class="absolute top-0 left-0 w-1 h-full bg-red-500"></div>
+        <div class="absolute top-0 left-0 w-1 h-full bg-yellow-500"></div>
         <h4 class="text-sm font-bold text-white mb-4 uppercase tracking-wider flex items-center">
-            <i class="fa-solid fa-plus-circle mr-2"></i> 3. สร้างงาน (Multi-Chapter)
+            <i class="fa-solid fa-file-signature mr-2 text-yellow-400"></i> 3.1 สร้างงานเก็บคะแนน (ตามช่องคะแนน)
         </h4>
-        <form id="form-task" class="space-y-4">
-            <div>
-                <label class="text-[10px] text-white/50">เลือกวิชา</label>
-                <select id="task-subject-filter" class="w-full glass-input rounded-lg px-2 py-2 text-xs" onchange="renderTaskClassCheckboxes(); renderTaskChapterCheckboxes();">
-                    <option value="">-- เลือกวิชา --</option>
-                </select>
-            </div>
-            <div>
-                <label class="text-[10px] text-white/50">เลือกห้อง</label>
-                <div id="task-class-checkboxes" class="grid grid-cols-2 md:grid-cols-4 gap-2 bg-black/20 border border-white/5 rounded-lg p-2 max-h-32 overflow-y-auto"></div>
-            </div>
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+        <form id="form-task-accum" class="space-y-4">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                    <label class="text-[10px] text-white/50">ประเภท</label>
-                    <select id="task-category" class="w-full glass-input rounded-lg px-2 py-2 text-xs font-bold text-yellow-400">
-                        <option value="accum">คะแนนเก็บ (ตามช่อง)</option>
-                        <option value="midterm">สอบกลางภาค (Midterm)</option>
-                        <option value="special_mid">++ คะแนนช่วย (กลางภาค)</option>
-                        <option value="final">สอบปลายภาค (Final)</option>
-                        <option value="special_final">++ คะแนนช่วย (ปลายภาค)</option>
+                    <label class="text-[10px] text-white/50">วิชา</label>
+                    <select id="task-subject-accum" class="w-full glass-input rounded-lg px-2 py-2 text-xs" onchange="renderTaskClassCheckboxesAccum(); renderTaskChapterCheckboxesAccum();" required>
+                        <option value="">-- เลือกวิชา --</option>
                     </select>
                 </div>
-                <div id="chapter-wrapper">
-                    <label class="text-[10px] text-white/50">เลือกช่องคะแนน</label>
-                    <div id="task-chapter-checkboxes" class="flex flex-wrap gap-2"></div>
+                <div>
+                    <label class="text-[10px] text-white/50">เลือกห้องเรียน</label>
+                    <div id="task-class-accum" class="grid grid-cols-2 gap-2 bg-black/20 border border-white/5 rounded-lg p-2 max-h-24 overflow-y-auto"></div>
                 </div>
+            </div>
+            <div>
+                <label class="text-[10px] text-white/50">เลือกช่องคะแนนที่ต้องการลง (Multi-Chapter)</label>
+                <div id="task-chapter-accum" class="flex flex-wrap gap-2"></div>
             </div>
             <div class="grid grid-cols-12 gap-2">
                 <div class="col-span-8">
-                    <input id="task-name" class="w-full glass-input rounded-lg px-3 py-2 text-xs" placeholder="ชื่องาน">
+                    <input id="task-name-accum" class="w-full glass-input rounded-lg px-3 py-2 text-xs" placeholder="ชื่องาน (เช่น ใบงานที่ 1)" required>
                 </div>
                 <div class="col-span-4">
-                    <input id="task-max" type="number" class="w-full glass-input rounded-lg px-2 py-2 text-xs text-center" value="10" placeholder="Max">
+                    <input id="task-max-accum" type="number" class="w-full glass-input rounded-lg px-2 py-2 text-xs text-center" value="10" required>
                 </div>
             </div>
-            <button type="submit" class="w-full btn-red py-3 rounded-lg text-sm font-bold shadow-lg mt-2">สร้างรายการงาน</button>
+            <button type="submit" class="w-full btn-yellow py-3 rounded-lg text-sm font-bold shadow-lg">บันทึกงานเก็บคะแนน</button>
         </form>
     </div>
+
+    <div class="bg-white/5 p-5 rounded-2xl border border-white/10 relative overflow-hidden h-fit shadow-lg">
+        <div class="absolute top-0 left-0 w-1 h-full bg-red-600"></div>
+        <h4 class="text-sm font-bold text-white mb-4 uppercase tracking-wider flex items-center">
+            <i class="fa-solid fa-graduation-cap mr-2 text-red-400"></i> 3.2 สร้างรายการสอบ / คะแนนช่วย
+        </h4>
+        <form id="form-task-exam" class="space-y-4">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                    <label class="text-[10px] text-white/50">วิชา</label>
+                    <select id="task-subject-exam" class="w-full glass-input rounded-lg px-2 py-2 text-xs" onchange="renderTaskClassCheckboxesExam();" required></select>
+                </div>
+                <div>
+                    <label class="text-[10px] text-white/50">เลือกห้องเรียน</label>
+                    <div id="task-class-exam" class="grid grid-cols-2 gap-2 bg-black/20 border border-white/5 rounded-lg p-2 max-h-24 overflow-y-auto"></div>
+                </div>
+            </div>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div>
+                    <label class="text-[10px] text-white/50">ประเภทคะแนนสอบ</label>
+                    <select id="task-category-exam" class="w-full glass-input rounded-lg px-2 py-2 text-xs font-bold text-red-400">
+                        <option value="midterm">สอบกลางภาค (Midterm)</option>
+                        <option value="special_mid">++ คะแนนช่วยกลางภาค</option>
+                        <option value="final">สอบปลายภาค (Final)</option>
+                        <option value="special_final">++ คะแนนช่วยปลายภาค</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="text-[10px] text-white/50">คะแนนเต็ม</label>
+                    <input id="task-max-exam" type="number" class="w-full glass-input rounded-lg px-2 py-2 text-xs text-center font-bold" value="20">
+                </div>
+            </div>
+            <button type="submit" class="w-full btn-red py-3 rounded-lg text-sm font-bold shadow-lg">สร้างรายการสอบ</button>
+        </form>
+    </div>
+</div>
 
     <div class="bg-white/5 p-5 rounded-2xl border border-white/10 relative overflow-hidden h-fit shadow-lg">
         <div class="absolute top-0 left-0 w-1 h-full bg-purple-500"></div>
@@ -436,4 +462,5 @@
   <script type="module" src="js/main.js"></script>
  </body>
 </html>
+
 
