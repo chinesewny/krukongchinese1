@@ -251,7 +251,15 @@
                     <button onclick="updateExamConfig()" class="btn-yellow px-4 rounded-xl font-bold text-xs shadow-lg">บันทึก</button>
                 </div>
             </div>
-
+            <div class="bg-blue-600/10 p-5 rounded-2xl border border-blue-500/30">
+    <h4 class="text-sm font-bold text-blue-300 mb-3"><i class="fa-solid fa-file-csv mr-2"></i>นำเข้าคะแนน (CSV)</h4>
+    
+    <button onclick="downloadExamTemplate()" class="w-full py-2 rounded-xl bg-white/5 border border-white/10 text-white/70 font-bold text-xs shadow-lg mb-3 hover:bg-white/10 hover:text-white transition-all flex justify-center items-center gap-2">
+        <i class="fa-solid fa-download"></i> โหลดแม่แบบรายชื่อ
+    </button>
+    
+    <p class="text-[10px] text-white/60 mb-2">หรืออัปโหลดไฟล์ที่มี: <code>รหัสนักเรียน, คะแนน</code></p>
+    <input type="file" id="exam-csv-input" accept=".csv" class="hidden">
             <div class="bg-blue-600/10 p-5 rounded-2xl border border-blue-500/30">
                 <h4 class="text-sm font-bold text-blue-300 mb-3"><i class="fa-solid fa-file-csv mr-2"></i>นำเข้าคะแนน (CSV)</h4>
                 <p class="text-[10px] text-white/60 mb-2">รูปแบบไฟล์: <code>รหัสนักเรียน, คะแนน</code></p>
