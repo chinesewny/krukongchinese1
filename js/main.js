@@ -566,6 +566,7 @@ window.removeConfigSlot = removeConfigSlot;
 // --- 3. Event Listeners & Init ---
 
 function initEventListeners() {
+    // 1. ค้นหารายชื่อเพื่อนร่วมกลุ่ม
     const friendSearch = document.getElementById('friend-search');
     if (friendSearch) {
         friendSearch.addEventListener('input', (e) => {
@@ -576,6 +577,7 @@ function initEventListeners() {
         });
     }
 
+    // 2. การกด Enter เพื่อบันทึกอีเมล
     const emailInput = document.getElementById('user-email-input');
     if (emailInput) {
         emailInput.onkeydown = (e) => { 
@@ -583,6 +585,7 @@ function initEventListeners() {
         };
     }
 
+    // 3. จัดการการเลือกไฟล์ CSV
     const csvInput = document.getElementById('exam-csv-input');
     if (csvInput) {
         csvInput.addEventListener('change', (e) => {
@@ -599,6 +602,7 @@ function initEventListeners() {
        });
     }
 
+    // 4. ฟอร์มส่งงานของนักเรียน
     const formSubmitWork = document.getElementById('form-submit-work');
     if (formSubmitWork) {
         formSubmitWork.onsubmit = async (e) => {
@@ -623,6 +627,7 @@ function initEventListeners() {
         };
     }
 
+    // 5. ฟอร์มเข้าสู่ระบบแอดมิน
     const adminLoginForm = document.getElementById('admin-login-form');
     if (adminLoginForm) {
         adminLoginForm.onsubmit = async (e) => { 
@@ -640,7 +645,7 @@ function initEventListeners() {
         };
     }
 
-    // 🟢 แยกฟอร์มงานเก็บคะแนน
+    // 6. ฟอร์มงานเก็บคะแนน (3.1)
     const formTaskAccum = document.getElementById('form-task-accum');
     if (formTaskAccum) {
         formTaskAccum.onsubmit = (e) => { 
@@ -648,33 +653,27 @@ function initEventListeners() {
             const subId = document.getElementById('task-subject-accum').value;
             const classCbs = document.querySelectorAll('#task-class-accum input:checked'); 
             const chapCbs = document.querySelectorAll('#task-chapter-accum .chapter-checkbox:checked'); 
-            
             if(!subId) return alert("กรุณาเลือกวิชา");
             if(classCbs.length === 0) return alert("กรุณาเลือกห้องเรียน"); 
             if(chapCbs.length === 0) return alert("กรุณาเลือกช่องคะแนน (Chapter)"); 
-
             const d = new Date(); d.setDate(d.getDate() + 7);
             const dueDate = d.toISOString().slice(0,10);
-
             saveAndRefresh({ 
-                action: 'addTask', 
-                id: Date.now(), 
+                action: 'addTask', id: Date.now(), 
                 classIds: Array.from(classCbs).map(c => c.value), 
-                subjectId: subId, 
-                category: 'accum', 
+                subjectId: subId, category: 'accum', 
                 chapter: Array.from(chapCbs).map(cb => cb.value), 
                 name: document.getElementById('task-name-accum').value, 
                 maxScore: document.getElementById('task-max-accum').value, 
                 dueDateISO: dueDate 
             }); 
-            
             e.target.reset(); 
             document.querySelectorAll('#task-chapter-accum .chapter-checkbox').forEach(c => c.checked = false);
             showToast("สร้างงานเก็บคะแนนเรียบร้อย");
         };
     }
 
-    // 🔴 แยกฟอร์มงานสอบ
+    // 7. ฟอร์มงานสอบ (3.2)
     const formTaskExam = document.getElementById('form-task-exam');
     if (formTaskExam) {
         formTaskExam.onsubmit = (e) => { 
@@ -682,15 +681,9 @@ function initEventListeners() {
             const subId = document.getElementById('task-subject-exam').value;
             const classCbs = document.querySelectorAll('#task-class-exam input:checked'); 
             const category = document.getElementById('task-category-exam').value;
-            
             if(!subId) return alert("กรุณาเลือกวิชา");
             if(classCbs.length === 0) return alert("กรุณาเลือกห้องเรียน"); 
-
-            const names = {
-                'midterm': 'สอบกลางภาค', 'special_mid': 'คะแนนช่วยกลางภาค',
-                'final': 'สอบปลายภาค', 'special_final': 'คะแนนช่วยปลายภาค'
-            };
-
+            const names = { 'midterm': 'สอบกลางภาค', 'special_mid': 'คะแนนช่วยกลางภาค', 'final': 'สอบปลายภาค', 'special_final': 'คะแนนช่วยปลายภาค' };
             saveAndRefresh({ 
                 action: 'addTask', id: Date.now(), 
                 classIds: Array.from(classCbs).map(c => c.value), 
@@ -699,27 +692,18 @@ function initEventListeners() {
                 maxScore: document.getElementById('task-max-exam').value, 
                 dueDateISO: getThaiDateISO() 
             }); 
-            
             e.target.reset(); 
             showToast(`สร้างรายการ ${names[category]} เรียบร้อย`);
         };
     }
 
+    // 8. Event เมื่อเปลี่ยนวิชาในหน้าสร้างงาน
     const subAccum = document.getElementById('task-subject-accum');
-    if (subAccum) {
-        subAccum.onchange = () => { 
-            renderTaskClassCheckboxesAccum(); 
-            renderTaskChapterCheckboxesAccum(); 
-        };
-    }
-
+    if (subAccum) { subAccum.onchange = () => { window.renderTaskClassCheckboxesAccum(); window.renderTaskChapterCheckboxesAccum(); }; }
     const subExam = document.getElementById('task-subject-exam');
-    if (subExam) {
-        subExam.onchange = () => { 
-            renderTaskClassCheckboxesExam(); 
-        };
-    }
+    if (subExam) { subExam.onchange = () => { window.renderTaskClassCheckboxesExam(); }; }
 
+    // 9. ตารางสอน
     const formSchedule = document.getElementById('form-schedule');
     if (formSchedule) {
         formSchedule.onsubmit = (e) => { 
@@ -728,6 +712,7 @@ function initEventListeners() {
         };
     }
 
+    // 10. รายงานผลการเรียน
     const reportSub = document.getElementById('report-subject');
     if (reportSub) {
         reportSub.onchange = () => { 
@@ -743,19 +728,36 @@ function initEventListeners() {
         };
     }
 
+    // 🟢 11. เมนูให้คะแนน (Scan & Manual)
     const scanClass = document.getElementById('scan-class-select');
-    if (scanClass) scanClass.onchange = () => { updateScanTaskDropdown(); renderScoreRoster(); };
-    
+    if (scanClass) {
+        scanClass.onchange = () => { 
+            window.updateScanTaskDropdown(); 
+            window.renderScoreRoster(); 
+        };
+    }
+
+    // --- ส่วนที่เพิ่มกลับเข้าไปตามคำขอของคุณครู ---
+    const scanTask = document.getElementById('scan-task-select');
+    if (scanTask) {
+        scanTask.onchange = () => {
+            window.renderScoreRoster();
+        };
+    }
+    // ----------------------------------------
+
+    // 12. เมนูเช็คชื่อ
     const attClass = document.getElementById('att-class-select');
     if (attClass) attClass.onchange = renderAttRoster;
-
     const attDate = document.getElementById('att-date-input');
     if (attDate) attDate.onchange = renderAttRoster;
 
+    // 13. จัดการข้อมูลพื้นฐาน
     const fSub = document.getElementById('form-subject'); if(fSub) fSub.onsubmit = (e) => { e.preventDefault(); saveAndRefresh({ action:'addSubject', id:Date.now(), name:document.getElementById('subject-name').value }); e.target.reset(); };
     const fCls = document.getElementById('form-class'); if(fCls) fCls.onsubmit = (e) => { e.preventDefault(); saveAndRefresh({ action:'addClass', id:Date.now(), name:document.getElementById('class-name').value, subjectId:document.getElementById('class-subject-ref').value }); e.target.reset(); };
     const fStd = document.getElementById('form-student'); if(fStd) fStd.onsubmit = (e) => { e.preventDefault(); saveAndRefresh({ action: 'addStudent', id: Date.now(), classId: document.getElementById('student-class').value, no: document.getElementById('student-no').value, code: document.getElementById('student-id').value, name: document.getElementById('student-name').value }); e.target.reset(); };
     
+    // 14. บันทึกคะแนนผ่าน Modal
     const btnSaveScore = document.getElementById('btn-modal-save');
     if (btnSaveScore) {
         btnSaveScore.onclick = () => { 
@@ -768,6 +770,7 @@ function initEventListeners() {
         };
     }
 
+    // 15. ช่องทางสแกนบาร์โค้ด
     const attScan = document.getElementById('att-scan-input');
     if (attScan) {
         attScan.onkeydown = (e) => { 
@@ -784,7 +787,6 @@ function initEventListeners() {
         };
     }
 }
-
 function startAutoSyncScheduler() {
     setInterval(() => {
         const now = new Date();
@@ -888,3 +890,4 @@ window.downloadExamTemplate = function() {
     link.click();
     document.body.removeChild(link);
 }
+
