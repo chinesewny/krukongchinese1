@@ -161,13 +161,25 @@ window.setScoreMode = function(m) {
     document.getElementById('scan-score-input').focus(); 
 }
 
+// แก้ไขฟังก์ชัน setAttMode ใน js/main.js
 window.setAttMode = function(mode) {
-    globalState.attMode = mode;
-    ['present','leave','absent','activity'].forEach(t => { document.getElementById(`btn-att-${t}`).classList.remove(`btn-att-active-${t}`); });
-    let btnId = '';
-    if(mode === 'มา') btnId = 'present'; else if(mode === 'ลา') btnId = 'leave'; else if(mode === 'ขาด') btnId = 'absent'; else if(mode === 'กิจกรรม') btnId = 'activity';
-    if(btnId) document.getElementById(`btn-att-${btnId}`).classList.add(`btn-att-active-${btnId}`);
+    globalState.attMode = mode; // บันทึกโหมดที่เลือกลงใน globalState
+    
+    // ปรับ UI ปุ่มให้แสดงว่าเลือกโหมดไหนอยู่
+    ['present','leave','absent','activity'].forEach(t => { 
+        document.getElementById(`btn-att-${t}`).classList.remove(`btn-att-active-${t}`); 
+    });
+    
+    let btnMap = { 'มา': 'present', 'ลา': 'leave', 'ขาด': 'absent', 'กิจกรรม': 'activity' };
+    let btnId = btnMap[mode];
+    
+    if(btnId) {
+        document.getElementById(`btn-att-${btnId}`).classList.add(`btn-att-active-${btnId}`);
+    }
+    
+    // โฟกัสไปที่ช่องสแกนเผื่ออยากสแกนต่อ แต่ globalState.attMode ถูกตั้งค่าไว้สำหรับ "คลิก" แล้ว
     document.getElementById('att-scan-input').focus();
+    showToast(`โหมดเช็คชื่อ: ${mode}`, "bg-blue-600");
 }
 
 window.closeScoreModal = function() {
@@ -823,3 +835,4 @@ window.downloadExamTemplate = function() {
     link.click();
     document.body.removeChild(link);
 }
+
