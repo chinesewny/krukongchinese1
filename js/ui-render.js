@@ -106,11 +106,16 @@ export function renderConfigSlots() {
     if(totalEl) totalEl.textContent = total;
 }
 
-// ผูกฟังก์ชันเข้ากับ window
+// --- ส่วนการผูกฟังก์ชัน (Window Binding) ใน js/ui-render.js ---
+
 window.renderTaskClassCheckboxesAccum = renderTaskClassCheckboxesAccum;
 window.renderTaskChapterCheckboxesAccum = renderTaskChapterCheckboxesAccum;
 window.renderTaskClassCheckboxesExam = renderTaskClassCheckboxesExam;
 window.renderConfigSlots = renderConfigSlots;
+
+// 🟢 เพิ่มบรรทัดนี้เพื่อให้ระบบหาฟังก์ชันเจอ
+window.updateScanTaskDropdown = updateScanTaskDropdown; 
+window.renderScoreRoster = renderScoreRoster;
 
 // --- 2. Render Functions (Admin) ---
 
@@ -490,3 +495,4 @@ export function refreshUI() {
 }
 
 window.refreshUI = refreshUI;
+
