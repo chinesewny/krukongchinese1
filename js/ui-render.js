@@ -19,6 +19,9 @@ function refreshDropdowns() {
     setOpts('mat-subject', dataState.subjects); 
     setOpts('sch-class', dataState.classes); 
     setOpts('report-subject', dataState.subjects); 
+    
+    // เพิ่ม Dropdown สำหรับหน้า Exam
+    setOpts('exam-class-select', dataState.classes);
 }
 
 function updateInboxBadge() { 
@@ -170,7 +173,8 @@ export function renderGradeReport() {
     const tasks = dataState.tasks.filter(t => t.classId == cid);
     
     dataState.students.filter(s => s.classId == cid).sort((a,b)=>Number(a.no)-Number(b.no)).forEach((s, idx) => { 
-        const { chapScores, midterm, final, total } = calculateScores(s.id, cid, tasks);
+        // เรียกใช้ calculateScores ซึ่งตอนนี้คืนค่าแยก Raw/Help มาด้วย
+        const { chapScores, midterm, final, total, midtermRaw, midtermHelp, finalRaw, finalHelp } = calculateScores(s.id, cid, tasks);
         const grade = calGrade(total);
         
         const tr = document.createElement('tr'); 
@@ -181,16 +185,109 @@ export function renderGradeReport() {
             let roundedScore = Math.round(Number(score)); 
             html += `<td class="text-center text-yellow-400 font-mono">${roundedScore}</td>`;
         });
-        let formattedTotal = Number(total).toFixed(1);
+        
+        // แสดงผลกลางภาค: ถ้ามีคะแนนช่วย ให้โชว์ "คะแนนสอบ + ช่วย"
+        let midDisplay = Number(midterm).toFixed(0);
+        if (midtermHelp > 0) {
+            midDisplay = `<div class="flex flex-col items-center leading-tight">
+                <span class="font-bold">${midtermRaw}</span>
+                <span class="text-[9px] text-green-400 font-bold">+${midtermHelp}</span>
+            </div>`;
+        }
 
-        html += `<td class="text-center text-blue-400 font-bold">${midterm}</td>
-                 <td class="text-center text-red-400 font-bold">${final}</td>
-                 <td class="text-center font-bold text-white bg-white/10">${formattedTotal}</td>
-                 <td class="text-center text-green-400 font-bold text-lg">${grade}</td>`;
+        // แสดงผลปลายภาค: ถ้ามีคะแนนช่วย ให้โชว์ "คะแนนสอบ + ช่วย"
+        let finalDisplay = Number(final).toFixed(0);
+        if (finalHelp > 0) {
+            finalDisplay = `<div class="flex flex-col items-center leading-tight">
+                <span class="font-bold">${finalRaw}</span>
+                <span class="text-[9px] text-green-400 font-bold">+${finalHelp}</span>
+            </div>`;
+        }
+
+        html += `<td class="text-center text-blue-400 font-bold">${midDisplay}</td>
+                 <td class="text-center text-red-400 font-bold">${finalDisplay}</td>
+                 <td class="text-center font-bold text-white bg-white/10 text-lg">${Number(total).toFixed(1)}</td>
+                 <td class="text-center text-green-400 font-bold text-xl drop-shadow-md">${grade}</td>`;
         
         tr.innerHTML = html; 
         tbody.appendChild(tr); 
     }); 
+}
+
+// --- ฟังก์ชันใหม่: แสดงหน้าจอจัดการสอบ (Exam Panel) ---
+export function renderExamPanel() {
+    const panel = document.getElementById('admin-panel-exam');
+    if (!panel || panel.classList.contains('hidden')) return;
+
+    const classSelect = document.getElementById('exam-class-select');
+    // เติม Option ถ้ายังไม่มี (กรณี refresh หน้าจอแล้ว dropdown ว่าง)
+    if(classSelect.options.length <= 1) { 
+        classSelect.innerHTML = '<option value="">-- เลือกห้องเรียน --</option>';
+        dataState.classes.forEach(c => {
+            const o = document.createElement('option');
+            o.value = c.id;
+            o.textContent = c.name;
+            classSelect.appendChild(o);
+        });
+    }
+
+    const classId = classSelect.value;
+    const tbody = document.getElementById('exam-table-body');
+    const maxInput = document.getElementById('exam-max-score');
+    tbody.innerHTML = '';
+
+    if (!classId) {
+        tbody.innerHTML = '<tr><td colspan="3" class="text-center py-10 text-white/30">กรุณาเลือกห้องเรียน</td></tr>';
+        return;
+    }
+
+    // ตรวจสอบประเภทการสอบปัจจุบัน (midterm / final)
+    const type = globalState.currentExamType || 'midterm';
+    
+    // ค้นหา Task ที่ตรงกับ Class และ Category
+    let task = dataState.tasks.find(t => t.classId == classId && t.category === type);
+    
+    if (task) {
+        maxInput.value = task.maxScore;
+    } else {
+        // ค่า Default ถ้ายังไม่มี Task: กลางภาค=20, ปลายภาค=30
+        maxInput.value = type === 'midterm' ? 20 : 30;
+    }
+
+    // Render รายชื่อนักเรียน
+    const students = dataState.students.filter(s => s.classId == classId).sort((a, b) => Number(a.no) - Number(b.no));
+    
+    if(students.length === 0) {
+         tbody.innerHTML = '<tr><td colspan="3" class="text-center py-10 text-white/30">ไม่พบนักเรียนในห้องนี้</td></tr>';
+         return;
+    }
+
+    students.forEach(s => {
+        let scoreVal = '';
+        if (task) {
+            const sc = dataState.scores.find(x => x.studentId == s.id && x.taskId == task.id);
+            if (sc) scoreVal = sc.score;
+        }
+
+        const tr = document.createElement('tr');
+        tr.className = "hover:bg-white/5 transition-colors border-b border-white/5 last:border-0";
+        tr.innerHTML = `
+            <td class="px-4 py-3 text-center text-white/50">${s.no}</td>
+            <td class="px-4 py-3 text-white">
+                <div class="font-bold text-sm">${s.name}</div>
+                <div class="text-[10px] text-white/30">${s.code}</div>
+            </td>
+            <td class="px-4 py-3 text-center">
+                <input type="number" 
+                       value="${scoreVal}" 
+                       onblur="window.saveExamScore('${s.id}', this.value)"
+                       onkeydown="if(event.key==='Enter') this.blur()"
+                       class="w-24 glass-input rounded-lg px-2 py-2 text-center font-bold text-yellow-400 focus:bg-white/10 outline-none text-lg" 
+                       placeholder="-">
+            </td>
+        `;
+        tbody.appendChild(tr);
+    });
 }
 
 export function renderIncomingSubmissions() { 
@@ -251,7 +348,7 @@ export function renderStudentDashboard(studentCode) {
         const midTask = subjectTasks.find(t => t.category === 'midterm');
         if (midTask) {
             const hasScore = dataState.scores.some(sc => sc.studentId == s.id && sc.taskId == midTask.id);
-            if (hasScore) { 
+            if (hasScore || midterm > 0) { // Check midterm > 0 in case of help score
                 midDisplay = `<span class="text-blue-300 font-bold">${midterm}</span>`; 
                 if (midterm < (midTask.maxScore / 2)) { midDisplay = `<span class="text-orange-400 font-bold text-xs"><i class="fa-solid fa-triangle-exclamation"></i> ต้องแก้ไข (ไม่ผ่านเกณฑ์)</span>`; } 
             }
@@ -261,7 +358,7 @@ export function renderStudentDashboard(studentCode) {
         const finalTask = subjectTasks.find(t => t.category === 'final');
         if (finalTask) {
             const hasScore = dataState.scores.some(sc => sc.studentId == s.id && sc.taskId == finalTask.id);
-            if (hasScore) { 
+            if (hasScore || final > 0) { 
                 if (Number(final) > 0) { finalDisplay = `<i class="fa-solid fa-check text-green-400 text-xl"></i>`; } 
                 else { finalDisplay = `<span class="text-red-400 text-xs"><i class="fa-solid fa-xmark"></i> ขาดสอบ</span>`; } 
             }
@@ -424,11 +521,15 @@ export function refreshUI() {
     renderSubjectList();
     renderScheduleList();
     
+    // Check hidden class before render to prevent unnecessary calculation
     if(document.getElementById('admin-panel-scan') && !document.getElementById('admin-panel-scan').classList.contains('hidden')) { updateScanTaskDropdown(); renderScoreRoster(); }
     if(document.getElementById('admin-panel-report') && !document.getElementById('admin-panel-report').classList.contains('hidden')) { renderGradeReport(); }
     if(document.getElementById('admin-panel-homework') && !document.getElementById('admin-panel-homework').classList.contains('hidden')) { renderIncomingSubmissions(); }
     if(document.getElementById('admin-panel-attendance') && !document.getElementById('admin-panel-attendance').classList.contains('hidden')) { renderAttRoster(); }
     if(document.getElementById('admin-panel-material') && !document.getElementById('admin-panel-material').classList.contains('hidden')) { renderAdminMaterials(); }
+    
+    // Check if Exam panel is active
+    if(document.getElementById('admin-panel-exam') && !document.getElementById('admin-panel-exam').classList.contains('hidden')) { renderExamPanel(); }
     
     updateInboxBadge();
 
@@ -437,79 +538,4 @@ export function refreshUI() {
          const code = localStorage.getItem('current_student_code');
          if(code) { renderStudentDashboard(code); }
     }
-}
-// เพิ่มฟังก์ชันนี้ใน ui-render.js และ export
-
-export function renderExamPanel() {
-    const panel = document.getElementById('admin-panel-exam');
-    if (panel.classList.contains('hidden')) return;
-
-    const classSelect = document.getElementById('exam-class-select');
-    // เติม Option ถ้ายังไม่มี (เช็คว่ามี option ไหม หรือว่างเปล่า)
-    if(classSelect.options.length <= 1) { // สมมติว่ามีแค่ placeholder
-        classSelect.innerHTML = '<option value="">-- เลือกห้องเรียน --</option>';
-        dataState.classes.forEach(c => {
-            const o = document.createElement('option');
-            o.value = c.id;
-            o.textContent = c.name;
-            classSelect.appendChild(o);
-        });
-    }
-
-    const classId = classSelect.value;
-    const tbody = document.getElementById('exam-table-body');
-    tbody.innerHTML = '';
-    const maxInput = document.getElementById('exam-max-score');
-
-    if (!classId) {
-        tbody.innerHTML = '<tr><td colspan="3" class="text-center py-10 text-white/30">กรุณาเลือกห้องเรียน</td></tr>';
-        return;
-    }
-
-    const type = globalState.currentExamType || 'midterm';
-    
-    // หา Task สอบ
-    let task = dataState.tasks.find(t => t.classId == classId && t.category === type);
-    
-    if (task) {
-        maxInput.value = task.maxScore;
-    } else {
-        // ถ้ายังไม่มี Task ให้แสดงค่า Default ตามประเภท
-        maxInput.value = type === 'midterm' ? 20 : 30;
-    }
-
-    // Render นักเรียน
-    const students = dataState.students.filter(s => s.classId == classId).sort((a, b) => Number(a.no) - Number(b.no));
-    
-    if(students.length === 0) {
-         tbody.innerHTML = '<tr><td colspan="3" class="text-center py-10 text-white/30">ไม่พบนักเรียนในห้องนี้</td></tr>';
-         return;
-    }
-
-    students.forEach(s => {
-        let scoreVal = '';
-        if (task) {
-            const sc = dataState.scores.find(x => x.studentId == s.id && x.taskId == task.id);
-            if (sc) scoreVal = sc.score;
-        }
-
-        const tr = document.createElement('tr');
-        tr.className = "hover:bg-white/5 transition-colors border-b border-white/5 last:border-0";
-        tr.innerHTML = `
-            <td class="px-4 py-3 text-center text-white/50">${s.no}</td>
-            <td class="px-4 py-3 text-white">
-                <div class="font-bold text-sm">${s.name}</div>
-                <div class="text-[10px] text-white/30">${s.code}</div>
-            </td>
-            <td class="px-4 py-3 text-center">
-                <input type="number" 
-                       value="${scoreVal}" 
-                       onblur="window.saveExamScore('${s.id}', this.value)"
-                       onkeydown="if(event.key==='Enter') this.blur()"
-                       class="w-20 glass-input rounded-lg px-2 py-1 text-center font-bold text-yellow-400 focus:bg-white/10 outline-none" 
-                       placeholder="-">
-            </td>
-        `;
-        tbody.appendChild(tr);
-    });
 }
