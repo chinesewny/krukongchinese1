@@ -562,6 +562,9 @@ window.renderTaskClassCheckboxes = renderTaskClassCheckboxesAccum;
 window.renderTaskChapterCheckboxes = renderTaskChapterCheckboxesAccum;
 window.updateTempConfig = updateTempConfig;
 window.removeConfigSlot = removeConfigSlot;
+// 🛠 เพิ่มฟังก์ชันให้หน้า 'ให้คะแนน' ทำงานได้สมบูรณ์
+window.updateScanTaskDropdown = updateScanTaskDropdown; 
+window.renderScoreRoster = renderScoreRoster;
 
 // --- 3. Event Listeners & Init ---
 
@@ -577,7 +580,7 @@ function initEventListeners() {
         });
     }
 
-    // 2. การกด Enter เพื่อบันทึกอีเมล
+    // 2. การกด Enter ในช่องกรอกอีเมล
     const emailInput = document.getElementById('user-email-input');
     if (emailInput) {
         emailInput.onkeydown = (e) => { 
@@ -703,7 +706,7 @@ function initEventListeners() {
     const subExam = document.getElementById('task-subject-exam');
     if (subExam) { subExam.onchange = () => { window.renderTaskClassCheckboxesExam(); }; }
 
-    // 9. ตารางสอน
+    // 9. ส่วนจัดการตารางสอน
     const formSchedule = document.getElementById('form-schedule');
     if (formSchedule) {
         formSchedule.onsubmit = (e) => { 
@@ -712,7 +715,7 @@ function initEventListeners() {
         };
     }
 
-    // 10. รายงานผลการเรียน
+    // 10. ส่วนจัดการรายงาน
     const reportSub = document.getElementById('report-subject');
     if (reportSub) {
         reportSub.onchange = () => { 
@@ -728,7 +731,7 @@ function initEventListeners() {
         };
     }
 
-    // 🟢 11. เมนูให้คะแนน (Scan & Manual)
+    // 11. เมนูให้คะแนน (Scan & Task selection)
     const scanClass = document.getElementById('scan-class-select');
     if (scanClass) {
         scanClass.onchange = () => { 
@@ -736,15 +739,12 @@ function initEventListeners() {
             window.renderScoreRoster(); 
         };
     }
-
-    // --- ส่วนที่เพิ่มกลับเข้าไปตามคำขอของคุณครู ---
     const scanTask = document.getElementById('scan-task-select');
     if (scanTask) {
         scanTask.onchange = () => {
             window.renderScoreRoster();
         };
     }
-    // ----------------------------------------
 
     // 12. เมนูเช็คชื่อ
     const attClass = document.getElementById('att-class-select');
@@ -752,12 +752,12 @@ function initEventListeners() {
     const attDate = document.getElementById('att-date-input');
     if (attDate) attDate.onchange = renderAttRoster;
 
-    // 13. จัดการข้อมูลพื้นฐาน
+    // 13. ฟอร์มข้อมูลพื้นฐาน
     const fSub = document.getElementById('form-subject'); if(fSub) fSub.onsubmit = (e) => { e.preventDefault(); saveAndRefresh({ action:'addSubject', id:Date.now(), name:document.getElementById('subject-name').value }); e.target.reset(); };
     const fCls = document.getElementById('form-class'); if(fCls) fCls.onsubmit = (e) => { e.preventDefault(); saveAndRefresh({ action:'addClass', id:Date.now(), name:document.getElementById('class-name').value, subjectId:document.getElementById('class-subject-ref').value }); e.target.reset(); };
     const fStd = document.getElementById('form-student'); if(fStd) fStd.onsubmit = (e) => { e.preventDefault(); saveAndRefresh({ action: 'addStudent', id: Date.now(), classId: document.getElementById('student-class').value, no: document.getElementById('student-no').value, code: document.getElementById('student-id').value, name: document.getElementById('student-name').value }); e.target.reset(); };
     
-    // 14. บันทึกคะแนนผ่าน Modal
+    // 14. ปุ่มบันทึกคะแนนใน Modal
     const btnSaveScore = document.getElementById('btn-modal-save');
     if (btnSaveScore) {
         btnSaveScore.onclick = () => { 
@@ -797,12 +797,48 @@ function initEventListeners() {
     if (modalScoreInput) {
         modalScoreInput.onkeydown = (e) => { 
             if (e.key === 'Enter') { 
-                e.preventDefault(); // ป้องกันการขึ้นบรรทัดใหม่
+                e.preventDefault(); 
                 const btnSave = document.getElementById('btn-modal-save');
-                if (btnSave) btnSave.click(); // สั่งบันทึกคะแนนทันที
+                if (btnSave) btnSave.click(); 
             } 
         };
     }
+
+    // 17. การสแกนเพื่อกรอกคะแนน
+    const scanScoreInput = document.getElementById('scan-score-input');
+    if (scanScoreInput) {
+        scanScoreInput.onkeydown = (e) => { 
+            if(e.key === 'Enter') { 
+                const val = e.target.value.trim(); 
+                const cid = document.getElementById('scan-class-select').value; 
+                if(!cid) return; 
+                const s = dataState.students.find(st => (String(st.code) == val || String(st.no) == val) && st.classId == cid); 
+                if(s) { 
+                    const tid = document.getElementById('scan-task-select').value; 
+                    const t = dataState.tasks.find(x=>x.id==tid); 
+                    if(t) { 
+                        if(globalState.scoreMode !== 'manual') { 
+                            if(Number(globalState.scoreMode) > Number(t.maxScore)) { alert("คะแนนที่เลือกเกินคะแนนเต็ม!"); } 
+                            else { saveAndRefresh({action:'addScore', studentId:s.id, taskId:t.id, score:globalState.scoreMode}); showToast(`${s.name} : ${globalState.scoreMode} คะแนน`); } 
+                        } else { 
+                            globalState.pendingScore = { s, t }; 
+                            document.getElementById('score-modal').classList.remove('hidden'); 
+                            document.getElementById('modal-task-name').textContent = t.name; 
+                            document.getElementById('modal-student-name').textContent = s.name; 
+                            document.getElementById('modal-max-score').textContent = t.maxScore; 
+                            const sc = dataState.scores.find(x => x.studentId == s.id && x.taskId == t.id); 
+                            document.getElementById('modal-score-input').value = sc ? sc.score : ''; 
+                            setTimeout(() => document.getElementById('modal-score-input').focus(), 100); 
+                        } 
+                        e.target.value = ''; 
+                    } 
+                } else { showToast("ไม่พบนักเรียน", "bg-red-600"); e.target.value = ''; } 
+            } 
+        };
+    }
+}
+
+// --- 4. Auto Sync/Backup Logic ---
 function startAutoSyncScheduler() {
     setInterval(() => {
         const now = new Date();
@@ -906,5 +942,3 @@ window.downloadExamTemplate = function() {
     link.click();
     document.body.removeChild(link);
 }
-
-
