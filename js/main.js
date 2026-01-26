@@ -567,16 +567,26 @@ window.removeConfigSlot = removeConfigSlot;
 // --- 3. Event Listeners & Init ---
 
 function initEventListeners() {
-    document.getElementById('friend-search').addEventListener('input', (e) => {
-        const term = e.target.value.toLowerCase();
-        document.querySelectorAll('.friend-item').forEach(item => { item.style.display = item.textContent.toLowerCase().includes(term) ? 'flex' : 'none'; });
-    });
+    // 1. ค้นหารายชื่อเพื่อนร่วมกลุ่ม (ในหน้าส่งงานของนักเรียน)
+    const friendSearch = document.getElementById('friend-search');
+    if (friendSearch) {
+        friendSearch.addEventListener('input', (e) => {
+            const term = e.target.value.toLowerCase();
+            document.querySelectorAll('.friend-item').forEach(item => { 
+                item.style.display = item.textContent.toLowerCase().includes(term) ? 'flex' : 'none'; 
+            });
+        });
+    }
 
-    document.getElementById('user-email-input').onkeydown = (e) => { 
-        if(e.key === 'Enter') { e.preventDefault(); window.saveUserEmail(); }
-    };
+    // 2. การกด Enter ในช่องกรอกอีเมล
+    const emailInput = document.getElementById('user-email-input');
+    if (emailInput) {
+        emailInput.onkeydown = (e) => { 
+            if(e.key === 'Enter') { e.preventDefault(); window.saveUserEmail(); }
+        };
+    }
 
-    // --- CSV Input Listener ---
+    // 3. จัดการการเลือกไฟล์ CSV สำหรับนำเข้าคะแนนสอบ
     const csvInput = document.getElementById('exam-csv-input');
     if (csvInput) {
         csvInput.addEventListener('change', (e) => {
@@ -593,228 +603,196 @@ function initEventListeners() {
        });
     }
 
-    document.getElementById('form-submit-work').onsubmit = async (e) => {
-        e.preventDefault();
-        const btn = document.getElementById('btn-submit-final');
-        const originalText = btn.innerHTML;
-        btn.disabled = true; btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> กำลังส่ง...';
-        const tid = document.getElementById('submit-task-id').value;
-        const sid = document.getElementById('submit-student-id').value;
-        const link = document.getElementById('submit-link-input').value;
-        const comment = document.getElementById('submit-comment-input').value;
-        const checkboxes = document.querySelectorAll('.friend-checkbox:checked');
-        let allStudentIds = [sid]; 
-        checkboxes.forEach(cb => allStudentIds.push(cb.value));
-        try {
-            await saveAndRefresh({ action: 'submitTask', taskId: tid, studentIds: allStudentIds, link: link, comment: comment });
-            document.getElementById('submit-modal').classList.add('hidden');
-            const s = dataState.students.find(x => x.id == sid);
-            if(s) renderStudentDashboard(s.code);
-        } catch(err) { alert("เกิดข้อผิดพลาด"); } 
-        finally { btn.disabled = false; btn.innerHTML = originalText; }
-    };
-
-    document.getElementById('admin-login-form').onsubmit = async (e) => { 
-        e.preventDefault(); 
-        const u=document.getElementById('admin-username').value;
-        const p=document.getElementById('admin-password').value; 
-        const res = await saveAndRefresh({action:'login', username:u, password:p}); 
-        if(res.status=='success'){ 
-            localStorage.setItem('wany_admin_session', res.token); 
-            window.switchMainTab('admin');
-            document.getElementById('admin-login-wrapper').classList.add('hidden'); 
-            document.getElementById('admin-content-wrapper').classList.remove('hidden'); 
-            refreshUI();
-        } else alert("รหัสผ่านไม่ถูกต้อง"); 
-    };
-    
-    // --- 🟢 ส่วนที่ปรับปรุงใหม่: แยกฟอร์มงานเก็บคะแนน และ ฟอร์มสอบ ---
-
-    // 1. จัดการฟอร์มงานเก็บคะแนน (Accumulative Tasks)
-    document.getElementById('form-task-accum').onsubmit = (e) => { 
-        e.preventDefault(); 
-        const classCbs = document.querySelectorAll('#task-class-accum input:checked'); 
-        const chapCbs = document.querySelectorAll('#task-chapter-accum .chapter-checkbox:checked'); 
-        
-        if(classCbs.length === 0) return alert("กรุณาเลือกห้องเรียน"); 
-        if(chapCbs.length === 0) return alert("กรุณาเลือกช่องคะแนน (Chapter)"); 
-
-        const d = new Date(); d.setDate(d.getDate() + 7); // กำหนดส่งล่วงหน้า 7 วัน
-        const dueDate = d.toISOString().slice(0,10);
-
-        saveAndRefresh({ 
-            action: 'addTask', 
-            id: Date.now(), 
-            classIds: Array.from(classCbs).map(c => c.value), 
-            subjectId: document.getElementById('task-subject-accum').value, 
-            category: 'accum', 
-            chapter: Array.from(chapCbs).map(cb => cb.value), 
-            name: document.getElementById('task-name-accum').value, 
-            maxScore: document.getElementById('task-max-accum').value, 
-            dueDateISO: dueDate 
-        }); 
-        
-        e.target.reset(); 
-        document.querySelectorAll('#task-chapter-accum .chapter-checkbox').forEach(c => c.checked = false);
-        showToast("สร้างงานเก็บคะแนนเรียบร้อย");
-    };
-
-    // 2. จัดการฟอร์มรายการสอบ / คะแนนช่วย (Exam Tasks)
-    document.getElementById('form-task-exam').onsubmit = (e) => { 
-        e.preventDefault(); 
-        const classCbs = document.querySelectorAll('#task-class-exam input:checked'); 
-        const category = document.getElementById('task-category-exam').value;
-        const subId = document.getElementById('task-subject-exam').value;
-        
-        if(!subId) return alert("กรุณาเลือกวิชา");
-        if(classCbs.length === 0) return alert("กรุณาเลือกห้องเรียน"); 
-
-        const names = {
-            'midterm': 'สอบกลางภาค',
-            'special_mid': 'คะแนนช่วยกลางภาค',
-            'final': 'สอบปลายภาค',
-            'special_final': 'คะแนนช่วยปลายภาค'
+    // 4. ฟอร์มส่งงานของนักเรียน
+    const formSubmitWork = document.getElementById('form-submit-work');
+    if (formSubmitWork) {
+        formSubmitWork.onsubmit = async (e) => {
+            e.preventDefault();
+            const btn = document.getElementById('btn-submit-final');
+            const originalText = btn.innerHTML;
+            btn.disabled = true; btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> กำลังส่ง...';
+            const tid = document.getElementById('submit-task-id').value;
+            const sid = document.getElementById('submit-student-id').value;
+            const link = document.getElementById('submit-link-input').value;
+            const comment = document.getElementById('submit-comment-input').value;
+            const checkboxes = document.querySelectorAll('.friend-checkbox:checked');
+            let allStudentIds = [sid]; 
+            checkboxes.forEach(cb => allStudentIds.push(cb.value));
+            try {
+                await saveAndRefresh({ action: 'submitTask', taskId: tid, studentIds: allStudentIds, link: link, comment: comment });
+                document.getElementById('submit-modal').classList.add('hidden');
+                const s = dataState.students.find(x => x.id == sid);
+                if(s) renderStudentDashboard(s.code);
+            } catch(err) { alert("เกิดข้อผิดพลาด"); } 
+            finally { btn.disabled = false; btn.innerHTML = originalText; }
         };
+    }
 
-        saveAndRefresh({ 
-            action: 'addTask', 
-            id: Date.now(), 
-            classIds: Array.from(classCbs).map(c => c.value), 
-            subjectId: subId, 
-            category: category, 
-            chapter: [], // สอบไม่ระบุบท
-            name: names[category], 
-            maxScore: document.getElementById('task-max-exam').value, 
-            dueDateISO: getThaiDateISO() 
-        }); 
-        
-        e.target.reset(); 
-        showToast(`สร้างรายการ ${names[category]} เรียบร้อย`);
-    };
+    // 5. ฟอร์มเข้าสู่ระบบแอดมิน
+    const adminLoginForm = document.getElementById('admin-login-form');
+    if (adminLoginForm) {
+        adminLoginForm.onsubmit = async (e) => { 
+            e.preventDefault(); 
+            const u=document.getElementById('admin-username').value;
+            const p=document.getElementById('admin-password').value; 
+            const res = await saveAndRefresh({action:'login', username:u, password:p}); 
+            if(res.status=='success'){ 
+                localStorage.setItem('wany_admin_session', res.token); 
+                window.switchMainTab('admin');
+                document.getElementById('admin-login-wrapper').classList.add('hidden'); 
+                document.getElementById('admin-content-wrapper').classList.remove('hidden'); 
+                refreshUI();
+            } else alert("รหัสผ่านไม่ถูกต้อง"); 
+        };
+    }
 
-    // --- 🔵 ฟังก์ชัน Helper สำหรับ Dropdown ของฟอร์มใหม่ ---
+    // --- 🟢 ส่วนที่แก้ไข: แยกฟอร์มงานเก็บคะแนน และ ฟอร์มสอบ เพื่อป้องกัน Null Error ---
 
-    window.renderTaskClassCheckboxesAccum = () => {
-        const subId = document.getElementById('task-subject-accum').value; 
-        const div = document.getElementById('task-class-accum'); 
-        if(!div) return;
-        div.innerHTML=''; 
-        dataState.classes.filter(c=>c.subjectId==subId).forEach(c => { 
-            const lbl = document.createElement('label'); 
-            lbl.className="flex items-center gap-2 p-2 rounded hover:bg-white/10 cursor-pointer"; 
-            lbl.innerHTML=`<input type="checkbox" value="${c.id}" class="accent-yellow-500 w-4 h-4 rounded"><span class="text-xs text-white/80">${c.name}</span>`; 
-            div.appendChild(lbl); 
-        }); 
-    };
+    // 6. จัดการฟอร์มงานเก็บคะแนน (Accumulative Tasks)
+    const formTaskAccum = document.getElementById('form-task-accum');
+    if (formTaskAccum) {
+        formTaskAccum.onsubmit = (e) => { 
+            e.preventDefault(); 
+            const subId = document.getElementById('task-subject-accum').value;
+            const classCbs = document.querySelectorAll('#task-class-accum input:checked'); 
+            const chapCbs = document.querySelectorAll('#task-chapter-accum .chapter-checkbox:checked'); 
+            
+            if(!subId) return alert("กรุณาเลือกวิชา");
+            if(classCbs.length === 0) return alert("กรุณาเลือกห้องเรียน"); 
+            if(chapCbs.length === 0) return alert("กรุณาเลือกช่องคะแนน (Chapter)"); 
 
-    window.renderTaskChapterCheckboxesAccum = () => {
-        const subId = document.getElementById('task-subject-accum').value; 
-        const container = document.getElementById('task-chapter-accum'); 
-        if(!container) return;
-        container.innerHTML = ''; 
-        if(!subId) return; 
-        const subj = dataState.subjects.find(s => s.id == subId);
-        const config = (subj && subj.scoreConfig && subj.scoreConfig.length > 0) ? subj.scoreConfig : Array(5).fill(10);
-        config.forEach((maxScore, index) => { 
-            const div = document.createElement('div');
-            div.className = "flex items-center gap-1 bg-black/20 px-2 py-1 rounded border border-white/10 cursor-pointer hover:bg-white/10";
-            div.innerHTML = `<input type="checkbox" id="chap-acc-${index+1}" value="${index+1}" class="chapter-checkbox accent-yellow-400 w-3 h-3"><label for="chap-acc-${index+1}" class="text-[10px] text-white cursor-pointer select-none">Ch.${index+1} <span class="text-white/50">(${maxScore})</span></label>`;
-            container.appendChild(div); 
-        }); 
-    };
+            const d = new Date(); d.setDate(d.getDate() + 7);
+            const dueDate = d.toISOString().slice(0,10);
 
-    window.renderTaskClassCheckboxesExam = () => {
-        const subId = document.getElementById('task-subject-exam').value; 
-        const div = document.getElementById('task-class-exam'); 
-        if(!div) return;
-        div.innerHTML=''; 
-        dataState.classes.filter(c=>c.subjectId==subId).forEach(c => { 
-            const lbl = document.createElement('label'); 
-            lbl.className="flex items-center gap-2 p-2 rounded hover:bg-white/10 cursor-pointer"; 
-            lbl.innerHTML=`<input type="checkbox" value="${c.id}" class="accent-red-500 w-4 h-4 rounded"><span class="text-xs text-white/80">${c.name}</span>`; 
-            div.appendChild(lbl); 
-        }); 
-    };
-    document.getElementById('form-schedule').onsubmit = (e) => { 
-        e.preventDefault(); 
-        saveAndRefresh({ action:'addSchedule', id:Date.now(), day: document.getElementById('sch-day').value, period: document.getElementById('sch-period').value, classId: document.getElementById('sch-class').value }); 
-    };
+            saveAndRefresh({ 
+                action: 'addTask', 
+                id: Date.now(), 
+                classIds: Array.from(classCbs).map(c => c.value), 
+                subjectId: subId, 
+                category: 'accum', 
+                chapter: Array.from(chapCbs).map(cb => cb.value), 
+                name: document.getElementById('task-name-accum').value, 
+                maxScore: document.getElementById('task-max-accum').value, 
+                dueDateISO: dueDate 
+            }); 
+            
+            e.target.reset(); 
+            document.querySelectorAll('#task-chapter-accum .chapter-checkbox').forEach(c => c.checked = false);
+            showToast("สร้างงานเก็บคะแนนเรียบร้อย");
+        };
+    }
 
-    document.getElementById('task-category').onchange = (e) => { e.target.value === 'accum' ? document.getElementById('chapter-wrapper').classList.remove('hidden') : document.getElementById('chapter-wrapper').classList.add('hidden'); }
-    document.getElementById('form-subject').onsubmit = (e) => { e.preventDefault(); saveAndRefresh({ action:'addSubject', id:Date.now(), name:document.getElementById('subject-name').value }); e.target.reset(); };
-    document.getElementById('form-class').onsubmit = (e) => { e.preventDefault(); saveAndRefresh({ action:'addClass', id:Date.now(), name:document.getElementById('class-name').value, subjectId:document.getElementById('class-subject-ref').value }); e.target.reset(); };
-    document.getElementById('form-student').onsubmit = (e) => { e.preventDefault(); saveAndRefresh({ action: 'addStudent', id: Date.now(), classId: document.getElementById('student-class').value, no: document.getElementById('student-no').value, code: document.getElementById('student-id').value, name: document.getElementById('student-name').value }); e.target.reset(); };
+    // 7. จัดการฟอร์มรายการสอบ / คะแนนช่วย (Exam Tasks)
+    const formTaskExam = document.getElementById('form-task-exam');
+    if (formTaskExam) {
+        formTaskExam.onsubmit = (e) => { 
+            e.preventDefault(); 
+            const subId = document.getElementById('task-subject-exam').value;
+            const classCbs = document.querySelectorAll('#task-class-exam input:checked'); 
+            const category = document.getElementById('task-category-exam').value;
+            
+            if(!subId) return alert("กรุณาเลือกวิชา");
+            if(classCbs.length === 0) return alert("กรุณาเลือกห้องเรียน"); 
+
+            const names = {
+                'midterm': 'สอบกลางภาค', 'special_mid': 'คะแนนช่วยกลางภาค',
+                'final': 'สอบปลายภาค', 'special_final': 'คะแนนช่วยปลายภาค'
+            };
+
+            saveAndRefresh({ 
+                action: 'addTask', id: Date.now(), 
+                classIds: Array.from(classCbs).map(c => c.value), 
+                subjectId: subId, category: category, chapter: [], 
+                name: names[category], 
+                maxScore: document.getElementById('task-max-exam').value, 
+                dueDateISO: getThaiDateISO() 
+            }); 
+            
+            e.target.reset(); 
+            showToast(`สร้างรายการ ${names[category]} เรียบร้อย`);
+        };
+    }
+
+    // 8. ตัวดักจับการเปลี่ยนวิชาในฟอร์มต่างๆ (Onchange)
+    const subAccum = document.getElementById('task-subject-accum');
+    if (subAccum) {
+        subAccum.onchange = () => { window.renderTaskClassCheckboxesAccum(); window.renderTaskChapterCheckboxesAccum(); };
+    }
+
+    const subExam = document.getElementById('task-subject-exam');
+    if (subExam) {
+        subExam.onchange = () => { window.renderTaskClassCheckboxesExam(); };
+    }
+
+    // 9. ส่วนจัดการตารางสอน และข้อมูลพื้นฐานอื่นๆ
+    const formSchedule = document.getElementById('form-schedule');
+    if (formSchedule) {
+        formSchedule.onsubmit = (e) => { 
+            e.preventDefault(); 
+            saveAndRefresh({ action:'addSchedule', id:Date.now(), day: document.getElementById('sch-day').value, period: document.getElementById('sch-period').value, classId: document.getElementById('sch-class').value }); 
+        };
+    }
+
+    // จัดการ Onchange สำหรับฟิลด์ทั่วไป (ถ้ามี)
+    const reportSub = document.getElementById('report-subject');
+    if (reportSub) {
+        reportSub.onchange = () => { 
+             const subId = reportSub.value; 
+             const classSelect = document.getElementById('report-class'); 
+             if(!classSelect) return;
+             classSelect.innerHTML = '<option value="">-- เลือกห้อง --</option>'; 
+             document.getElementById('report-table-body').innerHTML = ''; 
+             if(!subId) return; 
+             dataState.classes.filter(c => c.subjectId == subId).forEach(c => { 
+                const o = document.createElement('option'); o.value = c.id; o.textContent = c.name; classSelect.appendChild(o); 
+             }); 
+        };
+    }
+
+    // จัดการ Event สำหรับการสแกนและให้คะแนน (Scan Mode)
+    const scanClass = document.getElementById('scan-class-select');
+    if (scanClass) scanClass.onchange = () => { updateScanTaskDropdown(); renderScoreRoster(); };
     
-    document.getElementById('report-class').onchange = renderGradeReport;
-    document.getElementById('report-subject').onchange = () => { 
-         const subId = document.getElementById('report-subject').value; 
-         const classSelect = document.getElementById('report-class'); 
-         classSelect.innerHTML = '<option value="">-- เลือกห้อง --</option>'; 
-         document.getElementById('report-table-body').innerHTML = ''; 
-         if(!subId) return; 
-         const filteredClasses = dataState.classes.filter(c => c.subjectId == subId); 
-         filteredClasses.forEach(c => { const o = document.createElement('option'); o.value = c.id; o.textContent = c.name; classSelect.appendChild(o); }); 
-    };
+    const attClass = document.getElementById('att-class-select');
+    if (attClass) attClass.onchange = renderAttRoster;
+
+    const attDate = document.getElementById('att-date-input');
+    if (attDate) attDate.onchange = renderAttRoster;
+
+    // ส่วนประกอบอื่นๆ (Subjects, Classes, Students)
+    const fSub = document.getElementById('form-subject'); if(fSub) fSub.onsubmit = (e) => { e.preventDefault(); saveAndRefresh({ action:'addSubject', id:Date.now(), name:document.getElementById('subject-name').value }); e.target.reset(); };
+    const fCls = document.getElementById('form-class'); if(fCls) fCls.onsubmit = (e) => { e.preventDefault(); saveAndRefresh({ action:'addClass', id:Date.now(), name:document.getElementById('class-name').value, subjectId:document.getElementById('class-subject-ref').value }); e.target.reset(); };
+    const fStd = document.getElementById('form-student'); if(fStd) fStd.onsubmit = (e) => { e.preventDefault(); saveAndRefresh({ action: 'addStudent', id: Date.now(), classId: document.getElementById('student-class').value, no: document.getElementById('student-no').value, code: document.getElementById('student-id').value, name: document.getElementById('student-name').value }); e.target.reset(); };
     
-    document.getElementById('scan-class-select').onchange = () => { updateScanTaskDropdown(); renderScoreRoster(); };
-    document.getElementById('scan-task-select').onchange = renderScoreRoster;
-    document.getElementById('att-class-select').onchange = renderAttRoster;
-    document.getElementById('att-date-input').onchange = renderAttRoster;
-    
-    document.getElementById('btn-modal-save').onclick = () => { 
-        const val = document.getElementById('modal-score-input').value; 
-        const {s,t} = globalState.pendingScore; 
-        if(Number(val) > Number(t.maxScore)) return alert("เกินคะแนนเต็ม"); 
-        saveAndRefresh({action:'addScore', studentId:s.id, taskId:t.id, score:val}); 
-        window.closeScoreModal(); 
-        showToast("บันทึกแล้ว"); 
-    };
-    
-    document.getElementById('form-material').onsubmit = (e) => { e.preventDefault(); saveAndRefresh({ action: 'addMaterial', id: Date.now(), subjectId: document.getElementById('mat-subject').value, title: document.getElementById('mat-title').value, type: 'link', link: document.getElementById('mat-link').value }); e.target.reset(); }
-    
-    document.getElementById('modal-score-input').onkeydown = (e) => { if(e.key === 'Enter') document.getElementById('btn-modal-save').click(); };
-    document.getElementById('student-login-id').onkeydown = (e) => { if(e.key === 'Enter') window.handleStudentLogin(); };
-    
-    document.getElementById('att-scan-input').onkeydown = (e) => { 
-        if(e.key === 'Enter') { 
-            const val = e.target.value.trim(); 
-            const cid = document.getElementById('att-class-select').value; 
-            const date = document.getElementById('att-date-input').value; 
-            const mode = globalState.attMode || 'มา'; 
-            if(!cid) { alert("กรุณาเลือกห้องก่อน"); e.target.value=''; return; } 
-            const s = dataState.students.find(st => (String(st.code) == val || String(st.no) == val) && st.classId == cid); 
-            if(s) { saveAndRefresh({ action:'addAttendance', studentId:s.id, classId:cid, date:date, status:mode }); showToast(`${s.name} : ${mode}`, "bg-green-600"); } else { showToast(`ไม่พบรหัส: ${val}`, "bg-red-600"); } e.target.value = ''; 
-        } 
-    };
-    
-    document.getElementById('scan-score-input').onkeydown = (e) => { 
-        if(e.key === 'Enter') { 
-            const val = e.target.value.trim(); 
-            const cid = document.getElementById('scan-class-select').value; 
-            if(!cid) return; 
-            const s = dataState.students.find(st => (String(st.code) == val || String(st.no) == val) && st.classId == cid); 
-            if(s) { 
-                const tid = document.getElementById('scan-task-select').value; 
-                const t = dataState.tasks.find(x=>x.id==tid); 
-                if(t) { 
-                    if(globalState.scoreMode !== 'manual') { 
-                        if(Number(globalState.scoreMode) > Number(t.maxScore)) { alert("คะแนนที่เลือกเกินคะแนนเต็มของงานนี้!"); } 
-                        else { saveAndRefresh({action:'addScore', studentId:s.id, taskId:t.id, score:globalState.scoreMode}); showToast(`${s.name} : ${globalState.scoreMode} คะแนน`, "bg-green-600"); } 
-                    } else { 
-                        globalState.pendingScore = { s, t }; 
-                        document.getElementById('score-modal').classList.remove('hidden'); 
-                        document.getElementById('modal-task-name').textContent = t.name; 
-                        document.getElementById('modal-student-name').textContent = s.name; 
-                        document.getElementById('modal-max-score').textContent = t.maxScore; 
-                        const sc = dataState.scores.find(x => x.studentId == s.id && x.taskId == t.id); 
-                        document.getElementById('modal-score-input').value = sc ? sc.score : ''; 
-                        setTimeout(() => document.getElementById('modal-score-input').focus(), 100); 
-                    } 
-                    e.target.value = ''; 
-                } 
-            } else { showToast("ไม่พบนักเรียน", "bg-red-600"); e.target.value = ''; } 
-        } 
-    };
+    // บันทึกคะแนนแบบแมนนวลใน Modal
+    const btnSaveScore = document.getElementById('btn-modal-save');
+    if (btnSaveScore) {
+        btnSaveScore.onclick = () => { 
+            const val = document.getElementById('modal-score-input').value; 
+            const {s,t} = globalState.pendingScore; 
+            if(Number(val) > Number(t.maxScore)) return alert("เกินคะแนนเต็ม"); 
+            saveAndRefresh({action:'addScore', studentId:s.id, taskId:t.id, score:val}); 
+            window.closeScoreModal(); 
+            showToast("บันทึกแล้ว"); 
+        };
+    }
+
+    // ช่องทางสแกนคีย์บอร์ด (Barcode Scanner)
+    const attScan = document.getElementById('att-scan-input');
+    if (attScan) {
+        attScan.onkeydown = (e) => { 
+            if(e.key === 'Enter') { 
+                const val = e.target.value.trim(); 
+                const cid = document.getElementById('att-class-select').value; 
+                const date = document.getElementById('att-date-input').value; 
+                const mode = globalState.attMode || 'มา'; 
+                if(!cid) { alert("กรุณาเลือกห้องก่อน"); e.target.value=''; return; } 
+                const s = dataState.students.find(st => (String(st.code) == val || String(st.no) == val) && st.classId == cid); 
+                if(s) { saveAndRefresh({ action:'addAttendance', studentId:s.id, classId:cid, date:date, status:mode }); showToast(`${s.name} : ${mode}`, "bg-green-600"); } 
+                else { showToast(`ไม่พบรหัส: ${val}`, "bg-red-600"); } e.target.value = ''; 
+            } 
+        };
+    }
 }
 
 // --- 4. Auto Backup Scheduler (00:00 Daily) ---
@@ -926,6 +904,7 @@ window.downloadExamTemplate = function() {
     link.click();
     document.body.removeChild(link);
 }
+
 
 
 
