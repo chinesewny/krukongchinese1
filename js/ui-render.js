@@ -438,3 +438,78 @@ export function refreshUI() {
          if(code) { renderStudentDashboard(code); }
     }
 }
+// เพิ่มฟังก์ชันนี้ใน ui-render.js และ export
+
+export function renderExamPanel() {
+    const panel = document.getElementById('admin-panel-exam');
+    if (panel.classList.contains('hidden')) return;
+
+    const classSelect = document.getElementById('exam-class-select');
+    // เติม Option ถ้ายังไม่มี (เช็คว่ามี option ไหม หรือว่างเปล่า)
+    if(classSelect.options.length <= 1) { // สมมติว่ามีแค่ placeholder
+        classSelect.innerHTML = '<option value="">-- เลือกห้องเรียน --</option>';
+        dataState.classes.forEach(c => {
+            const o = document.createElement('option');
+            o.value = c.id;
+            o.textContent = c.name;
+            classSelect.appendChild(o);
+        });
+    }
+
+    const classId = classSelect.value;
+    const tbody = document.getElementById('exam-table-body');
+    tbody.innerHTML = '';
+    const maxInput = document.getElementById('exam-max-score');
+
+    if (!classId) {
+        tbody.innerHTML = '<tr><td colspan="3" class="text-center py-10 text-white/30">กรุณาเลือกห้องเรียน</td></tr>';
+        return;
+    }
+
+    const type = globalState.currentExamType || 'midterm';
+    
+    // หา Task สอบ
+    let task = dataState.tasks.find(t => t.classId == classId && t.category === type);
+    
+    if (task) {
+        maxInput.value = task.maxScore;
+    } else {
+        // ถ้ายังไม่มี Task ให้แสดงค่า Default ตามประเภท
+        maxInput.value = type === 'midterm' ? 20 : 30;
+    }
+
+    // Render นักเรียน
+    const students = dataState.students.filter(s => s.classId == classId).sort((a, b) => Number(a.no) - Number(b.no));
+    
+    if(students.length === 0) {
+         tbody.innerHTML = '<tr><td colspan="3" class="text-center py-10 text-white/30">ไม่พบนักเรียนในห้องนี้</td></tr>';
+         return;
+    }
+
+    students.forEach(s => {
+        let scoreVal = '';
+        if (task) {
+            const sc = dataState.scores.find(x => x.studentId == s.id && x.taskId == task.id);
+            if (sc) scoreVal = sc.score;
+        }
+
+        const tr = document.createElement('tr');
+        tr.className = "hover:bg-white/5 transition-colors border-b border-white/5 last:border-0";
+        tr.innerHTML = `
+            <td class="px-4 py-3 text-center text-white/50">${s.no}</td>
+            <td class="px-4 py-3 text-white">
+                <div class="font-bold text-sm">${s.name}</div>
+                <div class="text-[10px] text-white/30">${s.code}</div>
+            </td>
+            <td class="px-4 py-3 text-center">
+                <input type="number" 
+                       value="${scoreVal}" 
+                       onblur="window.saveExamScore('${s.id}', this.value)"
+                       onkeydown="if(event.key==='Enter') this.blur()"
+                       class="w-20 glass-input rounded-lg px-2 py-1 text-center font-bold text-yellow-400 focus:bg-white/10 outline-none" 
+                       placeholder="-">
+            </td>
+        `;
+        tbody.appendChild(tr);
+    });
+}
