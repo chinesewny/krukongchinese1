@@ -57,11 +57,22 @@ export function updateSyncUI(text, color) {
 // ย้าย Logic คำนวณคะแนนมาไว้ที่นี่เพื่อให้เรียกใช้ได้ทุกที่
 // js/utils.js
 
+// js/utils.js
+
+// ... (functions อื่นๆ เช่น getThaiDateISO, formatThaiDate, calGrade, showToast, showLoading, hideLoading, updateSyncUI เก็บไว้เหมือนเดิม) ...
+
 export function calculateScores(studentId, classId, tasks) {
-    let total = 0, midterm = 0, final = 0, special = 0; // เพิ่มตัวแปร special
+    // 1. ตัวแปรสำหรับเก็บผลรวม
+    let total = 0;
+    let midtermRaw = 0;      // คะแนนสอบกลางภาคเพียวๆ
+    let midtermHelp = 0;     // คะแนนช่วยกลางภาค
+    let finalRaw = 0;        // คะแนนสอบปลายภาคเพียวๆ
+    let finalHelp = 0;       // คะแนนช่วยปลายภาค
+    
     let chapStudentSum = Array(20).fill(0); 
     let chapMaxSum = Array(20).fill(0);     
     
+    // 2. ดึง Config คะแนนเต็มของแต่ละช่อง
     const cls = dataState.classes.find(c => c.id == classId);
     let subjectConfig = Array(20).fill(10); 
     if(cls) {
@@ -73,6 +84,7 @@ export function calculateScores(studentId, classId, tasks) {
 
     const classTasks = tasks.filter(t => t.classId == classId);
     
+    // 3. วนลูปงานทั้งหมดเพื่อแยกประเภทคะแนน
     classTasks.forEach(task => {
         const scoreRecord = dataState.scores.find(s => s.studentId == studentId && s.taskId == task.id);
         let score = scoreRecord ? Number(scoreRecord.score) : 0;
@@ -80,13 +92,21 @@ export function calculateScores(studentId, classId, tasks) {
         
         let taskMax = Number(task.maxScore) || 10; 
 
-        if (task.category === 'midterm') { midterm += score; }
-        else if (task.category === 'final') { final += score; }
-        else if (task.category === 'special') { 
-            // เก็บสะสมคะแนนพิเศษ (สูงสุด 3 คะแนนตามเงื่อนไข)
-            special += score; 
+        // --- แยกประเภทตาม Logic ใหม่ ---
+        if (task.category === 'midterm') { 
+            midtermRaw += score; 
+        }
+        else if (task.category === 'special_mid') { 
+            midtermHelp += score; // สะสมคะแนนช่วยกลางภาค
+        }
+        else if (task.category === 'final') { 
+            finalRaw += score; 
+        }
+        else if (task.category === 'special_final') { 
+            finalHelp += score;   // สะสมคะแนนช่วยปลายภาค
         }
         else if (task.category === 'accum') {
+            // คำนวณคะแนนเก็บ (เหมือนเดิม)
             if (task.chapter) {
                 let chaps = Array.isArray(task.chapter) ? task.chapter : String(task.chapter).split(',');
                 const validChaps = chaps.filter(ch => { const idx = Number(ch) - 1; return idx >= 0 && idx < 20; });
@@ -94,45 +114,53 @@ export function calculateScores(studentId, classId, tasks) {
                 if (validChaps.length > 0) {
                     const scoreShare = score / validChaps.length;
                     const maxShare = taskMax / validChaps.length;
-                    validChaps.forEach(ch => { const idx = Number(ch) - 1; chapStudentSum[idx] += scoreShare; chapMaxSum[idx] += maxShare; });
+                    validChaps.forEach(ch => { 
+                        const idx = Number(ch) - 1; 
+                        chapStudentSum[idx] += scoreShare; 
+                        chapMaxSum[idx] += maxShare; 
+                    });
                 }
-            } else { total += score; }
-        } else { total += score; }
+            } else { 
+                // กรณีเป็น Accum แต่ไม่ระบุบท (Rare case) ให้บวกเข้า Total ไปเลย หรือจะปัดทิ้งก็ได้
+                total += score; 
+            }
+        } 
+        // หมายเหตุ: category 'special' เดิมจะถูกข้ามไป หรือคุณอาจจะคงไว้ถ้าต้องการ Backward compatibility
     });
     
-    // จำกัดคะแนนพิเศษไม่เกิน 3 คะแนน
-    let remainingSpecial = Math.min(special, 3);
-
+    // 4. คำนวณคะแนนเก็บรายช่อง (Normalize)
     let chapScores = chapStudentSum.map((sumScore, idx) => {
         const sumMax = chapMaxSum[idx];
         const targetMax = Number(subjectConfig[idx]) || 10; 
         if (sumMax === 0) return 0; 
         
-        let calculated = (sumScore / sumMax) * targetMax;
-
-        // เงื่อนไข: ถ้านำไปช่วยคะแนนเก็บที่น้อยกว่า 13
-        if (remainingSpecial > 0 && calculated < 13) {
-            let space = 13 - calculated;
-            let add = Math.min(remainingSpecial, space);
-            calculated += add;
-            remainingSpecial -= add;
-        }
-
-        return calculated;
+        // เทียบบัญญัติไตรยางศ์กลับมาเป็นคะแนนเต็มของช่อง
+        return (sumScore / sumMax) * targetMax;
     });
 
-    // เงื่อนไข: คะแนนปลายภาค (บวกเพิ่มแต่ไม่เกินคะแนนเต็ม 30)
-    if (remainingSpecial > 0) {
-        let finalMax = 30; // ปลายภาคเต็ม 30 ตามที่คุณระบุ
-        let space = finalMax - final;
-        let add = Math.min(remainingSpecial, space);
-        final += add;
-        remainingSpecial -= add;
-    }
-
-    // คำนวณผลรวมใหม่
-    total += chapScores.reduce((a, b) => a + b, 0) + midterm + final;
+    // 5. รวมคะแนนสุทธิ (Net Score Calculation)
     
-    return { total, midterm, final, chapScores };
+    // คะแนนกลางภาคสุทธิ = สอบ + ช่วย
+    let midtermTotal = midtermRaw + midtermHelp;
+    
+    // คะแนนปลายภาคสุทธิ = สอบ + ช่วย
+    let finalTotal = finalRaw + finalHelp;
+
+    // คะแนนเก็บรวม
+    let accumTotal = chapScores.reduce((a, b) => a + b, 0);
+
+    // รวมทั้งหมด
+    total += accumTotal + midtermTotal + finalTotal;
+    
+    return { 
+        total: total, 
+        midterm: midtermTotal, // ส่งค่ากลับไปแสดงผลเป็นยอดรวมแล้ว
+        final: finalTotal,     // ส่งค่ากลับไปแสดงผลเป็นยอดรวมแล้ว
+        chapScores: chapScores,
+        midtermRaw: midtermRaw,   // ส่งค่าดิบเผื่ออยากใช้แสดงแยก (Optional)
+        midtermHelp: midtermHelp,
+        finalRaw: finalRaw,
+        finalHelp: finalHelp
+    };
 }
 
