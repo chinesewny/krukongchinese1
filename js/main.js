@@ -628,22 +628,113 @@ function initEventListeners() {
         } else alert("รหัสผ่านไม่ถูกต้อง"); 
     };
     
-    document.getElementById('form-task').onsubmit = (e) => { 
-        e.preventDefault(); 
-        const classCbs = document.querySelectorAll('#task-class-checkboxes input:checked'); 
-        const chapCbs = document.querySelectorAll('.chapter-checkbox:checked'); 
-        if(classCbs.length===0) return alert("เลือกห้อง"); 
-        const selectedChaps = Array.from(chapCbs).map(cb => cb.value); 
-        const cat = document.getElementById('task-category').value; 
-        if(cat === 'accum' && selectedChaps.length === 0) return alert("เลือกช่องคะแนน"); 
-        
-        const d = new Date(); d.setDate(d.getDate() + 7);
-        const nextWeekISO = d.toISOString().slice(0,10);
+    // --- 🟢 ส่วนที่ปรับปรุงใหม่: แยกฟอร์มงานเก็บคะแนน และ ฟอร์มสอบ ---
 
-        saveAndRefresh({ action: 'addTask', id: Date.now(), classIds: Array.from(classCbs).map(c=>c.value), subjectId: document.getElementById('task-subject-filter').value, category: cat, chapter: selectedChaps, name: document.getElementById('task-name').value, maxScore: document.getElementById('task-max').value, dueDateISO: nextWeekISO }); 
-        e.target.reset(); document.querySelectorAll('.chapter-checkbox').forEach(c => c.checked = false); alert("สร้างงานแล้ว (กำหนดส่งใน 7 วัน)"); 
+    // 1. จัดการฟอร์มงานเก็บคะแนน (Accumulative Tasks)
+    document.getElementById('form-task-accum').onsubmit = (e) => { 
+        e.preventDefault(); 
+        const classCbs = document.querySelectorAll('#task-class-accum input:checked'); 
+        const chapCbs = document.querySelectorAll('#task-chapter-accum .chapter-checkbox:checked'); 
+        
+        if(classCbs.length === 0) return alert("กรุณาเลือกห้องเรียน"); 
+        if(chapCbs.length === 0) return alert("กรุณาเลือกช่องคะแนน (Chapter)"); 
+
+        const d = new Date(); d.setDate(d.getDate() + 7); // กำหนดส่งล่วงหน้า 7 วัน
+        const dueDate = d.toISOString().slice(0,10);
+
+        saveAndRefresh({ 
+            action: 'addTask', 
+            id: Date.now(), 
+            classIds: Array.from(classCbs).map(c => c.value), 
+            subjectId: document.getElementById('task-subject-accum').value, 
+            category: 'accum', 
+            chapter: Array.from(chapCbs).map(cb => cb.value), 
+            name: document.getElementById('task-name-accum').value, 
+            maxScore: document.getElementById('task-max-accum').value, 
+            dueDateISO: dueDate 
+        }); 
+        
+        e.target.reset(); 
+        document.querySelectorAll('#task-chapter-accum .chapter-checkbox').forEach(c => c.checked = false);
+        showToast("สร้างงานเก็บคะแนนเรียบร้อย");
     };
 
+    // 2. จัดการฟอร์มรายการสอบ / คะแนนช่วย (Exam Tasks)
+    document.getElementById('form-task-exam').onsubmit = (e) => { 
+        e.preventDefault(); 
+        const classCbs = document.querySelectorAll('#task-class-exam input:checked'); 
+        const category = document.getElementById('task-category-exam').value;
+        const subId = document.getElementById('task-subject-exam').value;
+        
+        if(!subId) return alert("กรุณาเลือกวิชา");
+        if(classCbs.length === 0) return alert("กรุณาเลือกห้องเรียน"); 
+
+        const names = {
+            'midterm': 'สอบกลางภาค',
+            'special_mid': 'คะแนนช่วยกลางภาค',
+            'final': 'สอบปลายภาค',
+            'special_final': 'คะแนนช่วยปลายภาค'
+        };
+
+        saveAndRefresh({ 
+            action: 'addTask', 
+            id: Date.now(), 
+            classIds: Array.from(classCbs).map(c => c.value), 
+            subjectId: subId, 
+            category: category, 
+            chapter: [], // สอบไม่ระบุบท
+            name: names[category], 
+            maxScore: document.getElementById('task-max-exam').value, 
+            dueDateISO: getThaiDateISO() 
+        }); 
+        
+        e.target.reset(); 
+        showToast(`สร้างรายการ ${names[category]} เรียบร้อย`);
+    };
+
+    // --- 🔵 ฟังก์ชัน Helper สำหรับ Dropdown ของฟอร์มใหม่ ---
+
+    window.renderTaskClassCheckboxesAccum = () => {
+        const subId = document.getElementById('task-subject-accum').value; 
+        const div = document.getElementById('task-class-accum'); 
+        if(!div) return;
+        div.innerHTML=''; 
+        dataState.classes.filter(c=>c.subjectId==subId).forEach(c => { 
+            const lbl = document.createElement('label'); 
+            lbl.className="flex items-center gap-2 p-2 rounded hover:bg-white/10 cursor-pointer"; 
+            lbl.innerHTML=`<input type="checkbox" value="${c.id}" class="accent-yellow-500 w-4 h-4 rounded"><span class="text-xs text-white/80">${c.name}</span>`; 
+            div.appendChild(lbl); 
+        }); 
+    };
+
+    window.renderTaskChapterCheckboxesAccum = () => {
+        const subId = document.getElementById('task-subject-accum').value; 
+        const container = document.getElementById('task-chapter-accum'); 
+        if(!container) return;
+        container.innerHTML = ''; 
+        if(!subId) return; 
+        const subj = dataState.subjects.find(s => s.id == subId);
+        const config = (subj && subj.scoreConfig && subj.scoreConfig.length > 0) ? subj.scoreConfig : Array(5).fill(10);
+        config.forEach((maxScore, index) => { 
+            const div = document.createElement('div');
+            div.className = "flex items-center gap-1 bg-black/20 px-2 py-1 rounded border border-white/10 cursor-pointer hover:bg-white/10";
+            div.innerHTML = `<input type="checkbox" id="chap-acc-${index+1}" value="${index+1}" class="chapter-checkbox accent-yellow-400 w-3 h-3"><label for="chap-acc-${index+1}" class="text-[10px] text-white cursor-pointer select-none">Ch.${index+1} <span class="text-white/50">(${maxScore})</span></label>`;
+            container.appendChild(div); 
+        }); 
+    };
+
+    window.renderTaskClassCheckboxesExam = () => {
+        const subId = document.getElementById('task-subject-exam').value; 
+        const div = document.getElementById('task-class-exam'); 
+        if(!div) return;
+        div.innerHTML=''; 
+        dataState.classes.filter(c=>c.subjectId==subId).forEach(c => { 
+            const lbl = document.createElement('label'); 
+            lbl.className="flex items-center gap-2 p-2 rounded hover:bg-white/10 cursor-pointer"; 
+            lbl.innerHTML=`<input type="checkbox" value="${c.id}" class="accent-red-500 w-4 h-4 rounded"><span class="text-xs text-white/80">${c.name}</span>`; 
+            div.appendChild(lbl); 
+        }); 
+    };
     document.getElementById('form-schedule').onsubmit = (e) => { 
         e.preventDefault(); 
         saveAndRefresh({ action:'addSchedule', id:Date.now(), day: document.getElementById('sch-day').value, period: document.getElementById('sch-period').value, classId: document.getElementById('sch-class').value }); 
@@ -835,5 +926,6 @@ window.downloadExamTemplate = function() {
     link.click();
     document.body.removeChild(link);
 }
+
 
 
