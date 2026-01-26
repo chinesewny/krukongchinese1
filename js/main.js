@@ -789,3 +789,37 @@ window.addEventListener('DOMContentLoaded', () => {
         banner.classList.add('hidden'); globalState.smartClassId = null; 
     }, 60000);
 });
+window.downloadExamTemplate = function() {
+    const classId = document.getElementById('exam-class-select').value;
+    if (!classId) return alert("กรุณาเลือกห้องเรียนก่อนดาวน์โหลดแม่แบบ");
+
+    // 1. ดึงข้อมูลนักเรียนและจัดเรียงตามเลขที่
+    const students = dataState.students
+        .filter(s => s.classId == classId)
+        .sort((a, b) => Number(a.no) - Number(b.no));
+
+    if (students.length === 0) return alert("ไม่พบรายชื่อนักเรียนในห้องนี้");
+
+    const currentClass = dataState.classes.find(c => c.id == classId);
+    const type = globalState.currentExamType === 'final' ? 'Final' : 'Midterm';
+
+    // 2. สร้าง Header BOM เพื่อให้ Excel อ่านภาษาไทยออก (\uFEFF)
+    let csvContent = "\uFEFF"; 
+    csvContent += "รหัสนักเรียน,คะแนน,ชื่อ-นามสกุล (สำหรับตรวจสอบ)\n"; // Header
+
+    // 3. วนลูปสร้างแถวข้อมูล
+    students.forEach(s => {
+        // Format: รหัส, (เว้นว่างไว้ใส่คะแนน), ชื่อ
+        csvContent += `"${s.code}","",${s.name}\n`;
+    });
+
+    // 4. สร้าง Blob และดาวน์โหลด
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.setAttribute("href", url);
+    link.setAttribute("download", `Template_${type}_${currentClass.name}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+}
