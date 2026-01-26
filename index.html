@@ -107,7 +107,11 @@
                            <div><label class="text-[10px] text-white/50">เลือกวิชา</label><select id="task-subject-filter" class="w-full glass-input rounded-lg px-2 py-2 text-xs" onchange="renderTaskClassCheckboxes(); renderTaskChapterCheckboxes();"><option value="">-- เลือกวิชา --</option></select></div>
                            <div><label class="text-[10px] text-white/50">เลือกห้อง</label><div id="task-class-checkboxes" class="grid grid-cols-3 gap-2 bg-black/20 border border-white/5 rounded-lg p-2 max-h-24 overflow-y-auto"></div></div>
                             <div class="grid grid-cols-2 gap-3">
-                                <div><label class="text-[10px] text-white/50">ประเภท</label><select id="task-category" class="w-full glass-input rounded-lg px-2 py-2 text-xs font-bold text-yellow-400"><option value="accum">คะแนนเก็บ (ตามช่อง)</option><option value="midterm">กลางภาค</option><option value="final">ปลายภาค</option><option value="special">พิเศษ</option></select></div>
+                                <div><label class="text-[10px] text-white/50">ประเภท</label><select id="task-category" class="w-full glass-input rounded-lg px-2 py-2 text-xs font-bold text-yellow-400">
+    <option value="accum">คะแนนเก็บ (ตามช่อง)</option>
+    <option value="midterm">สอบกลางภาค (Midterm)</option>
+    <option value="special_mid">++ คะแนนช่วย (กลางภาค)</option> <option value="final">สอบปลายภาค (Final)</option>
+    <option value="special_final">++ คะแนนช่วย (ปลายภาค)</option> </select>
                                 <div id="chapter-wrapper">
                                     <label class="text-[10px] text-white/50">เลือกช่องคะแนน</label>
                                     <div id="task-chapter-checkboxes" class="flex flex-wrap gap-2"></div>
