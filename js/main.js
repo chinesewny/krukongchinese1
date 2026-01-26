@@ -21,7 +21,7 @@ import { PERIODS } from "./config.js";
 // --- Global Functions (Exposed to Window for HTML onclick) ---
 window.saveAndRefresh = saveAndRefresh;
 
-// 🛠 แก้ไขปัญหา switchMainTab is not defined
+// 🛠 ฟังก์ชันสลับแท็บหลัก
 window.switchMainTab = function(t) { 
     document.getElementById('section-admin').classList.add('hidden'); 
     document.getElementById('section-student').classList.add('hidden'); 
@@ -39,6 +39,7 @@ window.switchMainTab = function(t) {
     }
 }
 
+// 🛠 ฟังก์ชันสลับเมนูย่อยของ Admin
 window.switchAdminSubTab = function(t) {
     document.querySelectorAll('.admin-panel').forEach(p=>p.classList.add('hidden')); 
     document.getElementById(`admin-panel-${t}`).classList.remove('hidden'); 
@@ -557,19 +558,18 @@ window.exportAttendanceCSV = function() {
     document.body.removeChild(link);
 }
 
-// 🛠 เพิ่มฟังก์ชันสำรองเพื่อแก้ SyntaxError ในการดึงจาก ui-render
+// 🛠 ฟังก์ชันสำหรับเชื่อมต่อ ui-render
 window.renderTaskClassCheckboxes = renderTaskClassCheckboxesAccum;
 window.renderTaskChapterCheckboxes = renderTaskChapterCheckboxesAccum;
 window.updateTempConfig = updateTempConfig;
 window.removeConfigSlot = removeConfigSlot;
-// 🛠 เพิ่มฟังก์ชันให้หน้า 'ให้คะแนน' ทำงานได้สมบูรณ์
 window.updateScanTaskDropdown = updateScanTaskDropdown; 
 window.renderScoreRoster = renderScoreRoster;
 
 // --- 3. Event Listeners & Init ---
 
 function initEventListeners() {
-    // 1. ค้นหารายชื่อเพื่อนร่วมกลุ่ม
+    // 1. ค้นหารายชื่อเพื่อน
     const friendSearch = document.getElementById('friend-search');
     if (friendSearch) {
         friendSearch.addEventListener('input', (e) => {
@@ -580,7 +580,7 @@ function initEventListeners() {
         });
     }
 
-    // 2. การกด Enter ในช่องกรอกอีเมล
+    // 2. การกด Enter บันทึกอีเมล
     const emailInput = document.getElementById('user-email-input');
     if (emailInput) {
         emailInput.onkeydown = (e) => { 
@@ -588,7 +588,7 @@ function initEventListeners() {
         };
     }
 
-    // 3. จัดการการเลือกไฟล์ CSV
+    // 3. จัดการเลือกไฟล์ CSV
     const csvInput = document.getElementById('exam-csv-input');
     if (csvInput) {
         csvInput.addEventListener('change', (e) => {
@@ -605,7 +605,7 @@ function initEventListeners() {
        });
     }
 
-    // 4. ฟอร์มส่งงานของนักเรียน
+    // 4. ฟอร์มส่งงาน
     const formSubmitWork = document.getElementById('form-submit-work');
     if (formSubmitWork) {
         formSubmitWork.onsubmit = async (e) => {
@@ -630,7 +630,7 @@ function initEventListeners() {
         };
     }
 
-    // 5. ฟอร์มเข้าสู่ระบบแอดมิน
+    // 5. ล็อกอินแอดมิน
     const adminLoginForm = document.getElementById('admin-login-form');
     if (adminLoginForm) {
         adminLoginForm.onsubmit = async (e) => { 
@@ -700,13 +700,13 @@ function initEventListeners() {
         };
     }
 
-    // 8. Event เมื่อเปลี่ยนวิชาในหน้าสร้างงาน
+    // 8. Event เปลี่ยนวิชา
     const subAccum = document.getElementById('task-subject-accum');
     if (subAccum) { subAccum.onchange = () => { window.renderTaskClassCheckboxesAccum(); window.renderTaskChapterCheckboxesAccum(); }; }
     const subExam = document.getElementById('task-subject-exam');
     if (subExam) { subExam.onchange = () => { window.renderTaskClassCheckboxesExam(); }; }
 
-    // 9. ส่วนจัดการตารางสอน
+    // 9. ตารางสอน
     const formSchedule = document.getElementById('form-schedule');
     if (formSchedule) {
         formSchedule.onsubmit = (e) => { 
@@ -715,7 +715,7 @@ function initEventListeners() {
         };
     }
 
-    // 10. ส่วนจัดการรายงาน
+    // 10. รายงาน
     const reportSub = document.getElementById('report-subject');
     if (reportSub) {
         reportSub.onchange = () => { 
@@ -731,7 +731,7 @@ function initEventListeners() {
         };
     }
 
-    // 11. เมนูให้คะแนน (Scan & Task selection)
+    // 11. ให้คะแนน
     const scanClass = document.getElementById('scan-class-select');
     if (scanClass) {
         scanClass.onchange = () => { 
@@ -746,18 +746,18 @@ function initEventListeners() {
         };
     }
 
-    // 12. เมนูเช็คชื่อ
+    // 12. เช็คชื่อ
     const attClass = document.getElementById('att-class-select');
     if (attClass) attClass.onchange = renderAttRoster;
     const attDate = document.getElementById('att-date-input');
     if (attDate) attDate.onchange = renderAttRoster;
 
-    // 13. ฟอร์มข้อมูลพื้นฐาน
+    // 13. จัดการข้อมูล
     const fSub = document.getElementById('form-subject'); if(fSub) fSub.onsubmit = (e) => { e.preventDefault(); saveAndRefresh({ action:'addSubject', id:Date.now(), name:document.getElementById('subject-name').value }); e.target.reset(); };
     const fCls = document.getElementById('form-class'); if(fCls) fCls.onsubmit = (e) => { e.preventDefault(); saveAndRefresh({ action:'addClass', id:Date.now(), name:document.getElementById('class-name').value, subjectId:document.getElementById('class-subject-ref').value }); e.target.reset(); };
     const fStd = document.getElementById('form-student'); if(fStd) fStd.onsubmit = (e) => { e.preventDefault(); saveAndRefresh({ action: 'addStudent', id: Date.now(), classId: document.getElementById('student-class').value, no: document.getElementById('student-no').value, code: document.getElementById('student-id').value, name: document.getElementById('student-name').value }); e.target.reset(); };
     
-    // 14. ปุ่มบันทึกคะแนนใน Modal
+    // 14. บันทึก Modal
     const btnSaveScore = document.getElementById('btn-modal-save');
     if (btnSaveScore) {
         btnSaveScore.onclick = () => { 
@@ -770,7 +770,7 @@ function initEventListeners() {
         };
     }
 
-    // 15. ช่องทางสแกนบาร์โค้ด (เช็คชื่อ)
+    // 15. สแกนเช็คชื่อ
     const attScan = document.getElementById('att-scan-input');
     if (attScan) {
         attScan.onkeydown = (e) => { 
@@ -792,7 +792,7 @@ function initEventListeners() {
         };
     }
 
-    // 🟢 16. เพิ่มเติม: กด Enter เพื่อบันทึกคะแนนในหน้าต่าง Modal ทันที
+    // 16. กด Enter บันทึกคะแนนใน Modal
     const modalScoreInput = document.getElementById('modal-score-input');
     if (modalScoreInput) {
         modalScoreInput.onkeydown = (e) => { 
@@ -804,7 +804,7 @@ function initEventListeners() {
         };
     }
 
-    // 17. การสแกนเพื่อกรอกคะแนน
+    // 17. สแกนคะแนนหน้าหลัก
     const scanScoreInput = document.getElementById('scan-score-input');
     if (scanScoreInput) {
         scanScoreInput.onkeydown = (e) => { 
@@ -836,18 +836,16 @@ function initEventListeners() {
             } 
         };
     }
-}
+} // ปิดฟังก์ชัน initEventListeners อย่างถูกต้อง
 
-// --- 4. Auto Sync/Backup Logic ---
+// --- 4. Auto Backup Scheduler ---
 function startAutoSyncScheduler() {
     setInterval(() => {
         const now = new Date();
-        const hours = now.getHours();
-        const minutes = now.getMinutes();
-        if (hours === 0 && minutes <= 1) {
+        if (now.getHours() === 0 && now.getMinutes() <= 1) {
             const lastBackup = localStorage.getItem('last_backup_date');
             if (lastBackup !== now.toDateString()) {
-                // backupToGoogleSheet(); // เรียกใช้ถ้ามีฟังก์ชันนี้
+                // backupToGoogleSheet(); 
             }
         }
     }, 60000); 
@@ -896,7 +894,7 @@ window.addEventListener('DOMContentLoaded', () => {
         const now = new Date(); const day = now.getDay(); const timeStr = now.toTimeString().slice(0,5); 
         let currentPeriod = PERIODS.find(p => timeStr >= p.start && timeStr <= p.end); 
         const banner = document.getElementById('smart-att-banner'); 
-        if(currentPeriod && dataState.schedules) { 
+        if(currentPeriod && banner) { 
             const match = dataState.schedules.find(s => s.day == day && s.period == currentPeriod.p); 
             if(match) { 
                 const cls = dataState.classes.find(c => c.id == match.classId); 
@@ -908,8 +906,8 @@ window.addEventListener('DOMContentLoaded', () => {
                     return; 
                 } 
             } 
+            banner.classList.add('hidden'); globalState.smartClassId = null;
         } 
-        banner.classList.add('hidden'); globalState.smartClassId = null; 
     }, 60000);
 });
 
