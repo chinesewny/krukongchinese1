@@ -770,7 +770,7 @@ function initEventListeners() {
         };
     }
 
-    // 15. ช่องทางสแกนบาร์โค้ด
+    // 15. ช่องทางสแกนบาร์โค้ด (เช็คชื่อ)
     const attScan = document.getElementById('att-scan-input');
     if (attScan) {
         attScan.onkeydown = (e) => { 
@@ -781,12 +781,28 @@ function initEventListeners() {
                 const mode = globalState.attMode || 'มา'; 
                 if(!cid) { alert("กรุณาเลือกห้องก่อน"); e.target.value=''; return; } 
                 const s = dataState.students.find(st => (String(st.code) == val || String(st.no) == val) && st.classId == cid); 
-                if(s) { saveAndRefresh({ action:'addAttendance', studentId:s.id, classId:cid, date:date, status:mode }); showToast(`${s.name} : ${mode}`, "bg-green-600"); } 
-                else { showToast(`ไม่พบรหัส: ${val}`, "bg-red-600"); } e.target.value = ''; 
+                if(s) { 
+                    saveAndRefresh({ action:'addAttendance', studentId:s.id, classId:cid, date:date, status:mode }); 
+                    showToast(`${s.name} : ${mode}`, "bg-green-600"); 
+                } else { 
+                    showToast(`ไม่พบรหัส: ${val}`, "bg-red-600"); 
+                } 
+                e.target.value = ''; 
             } 
         };
     }
-}
+
+    // 🟢 16. เพิ่มเติม: กด Enter เพื่อบันทึกคะแนนในหน้าต่าง Modal ทันที
+    const modalScoreInput = document.getElementById('modal-score-input');
+    if (modalScoreInput) {
+        modalScoreInput.onkeydown = (e) => { 
+            if (e.key === 'Enter') { 
+                e.preventDefault(); // ป้องกันการขึ้นบรรทัดใหม่
+                const btnSave = document.getElementById('btn-modal-save');
+                if (btnSave) btnSave.click(); // สั่งบันทึกคะแนนทันที
+            } 
+        };
+    }
 function startAutoSyncScheduler() {
     setInterval(() => {
         const now = new Date();
@@ -890,4 +906,5 @@ window.downloadExamTemplate = function() {
     link.click();
     document.body.removeChild(link);
 }
+
 
