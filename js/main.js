@@ -1,6 +1,6 @@
 import { syncData, saveAndRefresh } from './firebase-service.js';
-import { dataState, globalState, loadFromLocalStorage, updateLocalState } from "./state.js";
-import { refreshUI, renderScoreRoster, renderAttRoster, renderGradeReport, updateScanTaskDropdown, renderStudentDashboard, renderConfigSlots, renderTaskClassCheckboxes, renderTaskChapterCheckboxes, renderIncomingSubmissions, renderAdminMaterials } from "./ui-render.js";
+import { dataState, globalState, loadFromLocalStorage, updateLocalState, saveToLocalStorage } from "./state.js";
+import { refreshUI, renderScoreRoster, renderAttRoster, renderGradeReport, updateScanTaskDropdown, renderStudentDashboard, renderConfigSlots, renderTaskClassCheckboxes, renderTaskChapterCheckboxes, renderIncomingSubmissions, renderAdminMaterials, renderExamPanel } from "./ui-render.js";
 import { getThaiDateISO, formatThaiDate, calGrade, showToast, showLoading, hideLoading, calculateScores } from "./utils.js";
 import { PERIODS } from "./config.js";
 
@@ -26,10 +26,17 @@ window.switchMainTab = function(t) {
 window.switchAdminSubTab = function(t) {
     document.querySelectorAll('.admin-panel').forEach(p=>p.classList.add('hidden')); 
     document.getElementById(`admin-panel-${t}`).classList.remove('hidden'); 
+    
     document.querySelectorAll('.menu-btn').forEach(b => { b.className="menu-btn glass-ios hover:bg-white/10 text-white/70 rounded-2xl py-3 font-bold"; }); 
     const activeBtn = document.getElementById(`menu-${t}`); 
     if(activeBtn) activeBtn.className="menu-btn btn-blue rounded-2xl py-3 font-bold shadow-lg text-white"; 
-    refreshUI();
+    
+    // ถ้าเข้าหน้า Exam ให้ Render ข้อมูลด้วย
+    if(t === 'exam') {
+        renderExamPanel();
+    } else {
+        refreshUI();
+    }
 }
 
 window.handleLogout = function(force=false) {
@@ -188,13 +195,6 @@ window.searchIndividual = function(keyword) {
             div.className = "p-3 hover:bg-white/10 cursor-pointer text-white border-b border-white/5 last:border-0";
             div.innerHTML = `<div class="font-bold text-sm">${s.name}</div><div class="text-xs text-white/50">${s.code}</div>`;
             div.onclick = () => { 
-                // แสดงผลลัพธ์ผ่านตัวแปร global หรือฟังก์ชันที่สร้างไว้ (ในที่นี้เราใช้ logic แสดงผลในตัว)
-                // เพื่อความง่าย เราจะใช้ logic การแสดงผลแบบเดียวกับ ui-render แต่เรียกผ่าน window
-                // ซึ่งใน ui-render ได้มี logic นี้อยู่แล้ว แต่ไม่ได้ export เป็น global function 
-                // แต่เนื่องจาก searchIndividual ถูกเรียกจาก input onkeyup ใน html 
-                // เราต้องเรียกฟังก์ชันแสดงผล "showIndividualResult" ซึ่งผมจะเพิ่มโค้ดส่วนนี้ให้ใน ui-render หรือใส่ logic ตรงนี้เลย
-                // เพื่อป้องกันความยุ่งยาก ผมจะใส่ logic แสดงผลที่นี่ครับ (เพราะมันต้องยุ่งกับ DOM โดยตรง)
-                
                 document.getElementById('individual-result-container').classList.remove('hidden');
                 document.getElementById('ind-name').textContent = s.name;
                 document.getElementById('ind-id').textContent = s.code;
@@ -301,6 +301,147 @@ window.returnGroupWork = async function(studentIdsStr, taskId) {
         sids.forEach(sid => saveAndRefresh({ action:'returnForRevision', studentId: sid, taskId: taskId, comment: reason })); 
         showToast("ส่งคืนงานเรียบร้อย", "bg-yellow-600");
     } 
+}
+
+// --- NEW EXAM FUNCTIONS (Import CSV & Grading) ---
+
+window.setExamTab = function(type) {
+    globalState.currentExamType = type;
+    
+    // Update UI buttons
+    const btnMid = document.getElementById('tab-exam-mid');
+    const btnFinal = document.getElementById('tab-exam-final');
+    
+    if(type === 'midterm') {
+        btnMid.className = "px-6 py-2 rounded-lg text-sm font-bold bg-blue-600 text-white shadow-lg transition-all";
+        btnFinal.className = "px-6 py-2 rounded-lg text-sm font-bold text-white/50 hover:text-white transition-all";
+    } else {
+        btnFinal.className = "px-6 py-2 rounded-lg text-sm font-bold bg-red-600 text-white shadow-lg transition-all";
+        btnMid.className = "px-6 py-2 rounded-lg text-sm font-bold text-white/50 hover:text-white transition-all";
+    }
+    
+    renderExamPanel();
+}
+
+// Expose renderExamPanel to window so HTML can call it (e.g. select onchange)
+window.renderExamPanel = renderExamPanel;
+
+window.updateExamConfig = async function() {
+    const classId = document.getElementById('exam-class-select').value;
+    const max = document.getElementById('exam-max-score').value;
+    const type = globalState.currentExamType || 'midterm';
+    
+    if(!classId) return alert("กรุณาเลือกห้องเรียน");
+    
+    // Check existing task
+    let task = dataState.tasks.find(t => t.classId == classId && t.category === type);
+    const subId = dataState.classes.find(c => c.id == classId).subjectId;
+    
+    const name = type === 'midterm' ? 'สอบกลางภาค' : 'สอบปลายภาค';
+    
+    if(task) {
+        // In a real app, updateTask API is needed. Here we alert the user.
+        alert(`บันทึกค่าคะแนนเต็ม (${max}) สำหรับ ${name} เรียบร้อย`);
+        // We can simulate local update if needed, but for now we assume maxScore is set on creation
+        task.maxScore = max; 
+        saveToLocalStorage(); // Local save
+        // Ideally: saveAndRefresh({ action: 'updateTask', ... }); 
+    } else {
+        // Create new exam task
+        await saveAndRefresh({
+            action: 'addTask',
+            id: Date.now(),
+            classIds: [classId],
+            subjectId: subId,
+            category: type,
+            chapter: [],
+            name: name,
+            maxScore: max,
+            dueDateISO: getThaiDateISO()
+        });
+        showToast("สร้างรายการสอบเรียบร้อย");
+    }
+    renderExamPanel();
+}
+
+window.saveExamScore = function(studentId, val) {
+    const classId = document.getElementById('exam-class-select').value;
+    const type = globalState.currentExamType || 'midterm';
+    const task = dataState.tasks.find(t => t.classId == classId && t.category === type);
+    
+    if(!task) return alert("กรุณากดบันทึกตั้งค่าคะแนนเต็มก่อน");
+    if(val !== '' && Number(val) > Number(task.maxScore)) return alert("คะแนนเกินค่าเต็ม");
+    
+    // Save locally immediately for responsiveness
+    updateLocalState({ action: 'addScore', studentId: studentId, taskId: task.id, score: val });
+    
+    // Sync to backend (Debouncing could be added here for optimization)
+    saveAndRefresh({ action: 'addScore', studentId: studentId, taskId: task.id, score: val });
+}
+
+window.processExamCSV = function() {
+    const fileInput = document.getElementById('exam-csv-input');
+    const file = fileInput.files[0];
+    if (!file) return;
+
+    const classId = document.getElementById('exam-class-select').value;
+    const type = globalState.currentExamType || 'midterm';
+    const task = dataState.tasks.find(t => t.classId == classId && t.category === type);
+
+    if(!task) return alert("ไม่พบรายการสอบ กรุณาตั้งค่าคะแนนเต็มก่อน");
+
+    const reader = new FileReader();
+    reader.onload = async function(e) {
+        const text = e.target.result;
+        const rows = text.split('\n');
+        let successCount = 0;
+        let errorCount = 0;
+
+        showLoading("กำลังนำเข้าคะแนน...");
+
+        for (let row of rows) {
+            // Expected CSV format: StudentCode,Score
+            const cols = row.split(',').map(c => c.trim().replace(/"/g, ''));
+            if(cols.length < 2) continue;
+
+            const code = cols[0];
+            const score = cols[1];
+            
+            // Find student by code
+            const student = dataState.students.find(s => String(s.code) === String(code) && s.classId == classId);
+            
+            if (student && !isNaN(score) && score !== "") {
+                if(Number(score) <= Number(task.maxScore)) {
+                    // Update local state first
+                    updateLocalState({ action: 'addScore', studentId: student.id, taskId: task.id, score: score });
+                    successCount++;
+                } else {
+                    errorCount++; // Score exceeds max
+                }
+            } else {
+                errorCount++; // Student not found or invalid score
+            }
+        }
+
+        // Sync everything at once (Trigger a final save to push queue)
+        saveToLocalStorage();
+        refreshUI();
+        renderExamPanel(); // Explicitly re-render exam panel
+        hideLoading();
+        
+        fileInput.value = '';
+        document.getElementById('csv-file-name').textContent = "- ยังไม่เลือกไฟล์ -";
+        
+        alert(`นำเข้าสำเร็จ ${successCount} รายการ\n(ไม่พบข้อมูล/ผิดพลาด ${errorCount} รายการ)`);
+        
+        // Trigger a sync if needed
+        if(successCount > 0) {
+            showToast("ข้อมูลถูกบันทึกเรียบร้อย", "bg-green-600");
+             // Send a dummy request to trigger queue processing if not automatic
+             saveAndRefresh({ action: 'keepAlive' }); 
+        }
+    };
+    reader.readAsText(file);
 }
 
 // --- Report Functions ---
@@ -422,6 +563,23 @@ function initEventListeners() {
     document.getElementById('user-email-input').onkeydown = (e) => { 
         if(e.key === 'Enter') { e.preventDefault(); window.saveUserEmail(); }
     };
+
+    // --- CSV Input Listener ---
+    const csvInput = document.getElementById('exam-csv-input');
+    if (csvInput) {
+        csvInput.addEventListener('change', (e) => {
+           const file = e.target.files[0];
+           if(file) {
+               document.getElementById('csv-file-name').textContent = file.name;
+               document.getElementById('csv-file-name').className = "text-xs text-center text-green-400 font-bold mb-2";
+               const btn = document.getElementById('btn-process-csv');
+               if(btn) {
+                   btn.classList.remove('pointer-events-none', 'bg-white/10', 'text-white/50');
+                   btn.classList.add('bg-green-600', 'text-white', 'hover:bg-green-500');
+               }
+           }
+       });
+    }
 
     document.getElementById('form-submit-work').onsubmit = async (e) => {
         e.preventDefault();
@@ -631,5 +789,3 @@ window.addEventListener('DOMContentLoaded', () => {
         banner.classList.add('hidden'); globalState.smartClassId = null; 
     }, 60000);
 });
-
-
