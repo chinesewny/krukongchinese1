@@ -1,11 +1,27 @@
 import { syncData, saveAndRefresh } from './firebase-service.js';
 import { dataState, globalState, loadFromLocalStorage, updateLocalState, saveToLocalStorage } from "./state.js";
-import { refreshUI, renderScoreRoster, renderAttRoster, renderGradeReport, updateScanTaskDropdown, renderStudentDashboard, renderConfigSlots, renderTaskClassCheckboxes, renderTaskChapterCheckboxes, renderIncomingSubmissions, renderAdminMaterials, renderExamPanel } from "./ui-render.js";
+import { 
+    refreshUI, 
+    renderScoreRoster, 
+    renderAttRoster, 
+    renderGradeReport, 
+    updateScanTaskDropdown, 
+    renderStudentDashboard, 
+    renderConfigSlots, 
+    renderTaskClassCheckboxesAccum, 
+    renderTaskChapterCheckboxesAccum, 
+    renderTaskClassCheckboxesExam,
+    renderIncomingSubmissions, 
+    renderAdminMaterials, 
+    renderExamPanel 
+} from "./ui-render.js";
 import { getThaiDateISO, formatThaiDate, calGrade, showToast, showLoading, hideLoading, calculateScores } from "./utils.js";
 import { PERIODS } from "./config.js";
 
 // --- Global Functions (Exposed to Window for HTML onclick) ---
 window.saveAndRefresh = saveAndRefresh;
+
+// 🛠 แก้ไขปัญหา switchMainTab is not defined
 window.switchMainTab = function(t) { 
     document.getElementById('section-admin').classList.add('hidden'); 
     document.getElementById('section-student').classList.add('hidden'); 
@@ -31,7 +47,6 @@ window.switchAdminSubTab = function(t) {
     const activeBtn = document.getElementById(`menu-${t}`); 
     if(activeBtn) activeBtn.className="menu-btn btn-blue rounded-2xl py-3 font-bold shadow-lg text-white"; 
     
-    // ถ้าเข้าหน้า Exam ให้ Render ข้อมูลด้วย
     if(t === 'exam') {
         renderExamPanel();
     } else {
@@ -161,23 +176,22 @@ window.setScoreMode = function(m) {
     document.getElementById('scan-score-input').focus(); 
 }
 
-// แก้ไขฟังก์ชัน setAttMode ใน js/main.js
 window.setAttMode = function(mode) {
-    globalState.attMode = mode; // บันทึกโหมดที่เลือกลงใน globalState
+    globalState.attMode = mode; 
     
-    // ปรับ UI ปุ่มให้แสดงว่าเลือกโหมดไหนอยู่
     ['present','leave','absent','activity'].forEach(t => { 
-        document.getElementById(`btn-att-${t}`).classList.remove(`btn-att-active-${t}`); 
+        const el = document.getElementById(`btn-att-${t}`);
+        if(el) el.classList.remove(`btn-att-active-${t}`); 
     });
     
     let btnMap = { 'มา': 'present', 'ลา': 'leave', 'ขาด': 'absent', 'กิจกรรม': 'activity' };
     let btnId = btnMap[mode];
     
     if(btnId) {
-        document.getElementById(`btn-att-${btnId}`).classList.add(`btn-att-active-${btnId}`);
+        const activeBtn = document.getElementById(`btn-att-${btnId}`);
+        if(activeBtn) activeBtn.classList.add(`btn-att-active-${btnId}`);
     }
     
-    // โฟกัสไปที่ช่องสแกนเผื่ออยากสแกนต่อ แต่ globalState.attMode ถูกตั้งค่าไว้สำหรับ "คลิก" แล้ว
     document.getElementById('att-scan-input').focus();
     showToast(`โหมดเช็คชื่อ: ${mode}`, "bg-blue-600");
 }
@@ -320,7 +334,6 @@ window.returnGroupWork = async function(studentIdsStr, taskId) {
 window.setExamTab = function(type) {
     globalState.currentExamType = type;
     
-    // Update UI buttons
     const btnMid = document.getElementById('tab-exam-mid');
     const btnFinal = document.getElementById('tab-exam-final');
     
@@ -335,7 +348,6 @@ window.setExamTab = function(type) {
     renderExamPanel();
 }
 
-// Expose renderExamPanel to window so HTML can call it (e.g. select onchange)
 window.renderExamPanel = renderExamPanel;
 
 window.updateExamConfig = async function() {
@@ -345,21 +357,16 @@ window.updateExamConfig = async function() {
     
     if(!classId) return alert("กรุณาเลือกห้องเรียน");
     
-    // Check existing task
     let task = dataState.tasks.find(t => t.classId == classId && t.category === type);
     const subId = dataState.classes.find(c => c.id == classId).subjectId;
     
     const name = type === 'midterm' ? 'สอบกลางภาค' : 'สอบปลายภาค';
     
     if(task) {
-        // In a real app, updateTask API is needed. Here we alert the user.
         alert(`บันทึกค่าคะแนนเต็ม (${max}) สำหรับ ${name} เรียบร้อย`);
-        // We can simulate local update if needed, but for now we assume maxScore is set on creation
         task.maxScore = max; 
-        saveToLocalStorage(); // Local save
-        // Ideally: saveAndRefresh({ action: 'updateTask', ... }); 
+        saveToLocalStorage(); 
     } else {
-        // Create new exam task
         await saveAndRefresh({
             action: 'addTask',
             id: Date.now(),
@@ -384,10 +391,7 @@ window.saveExamScore = function(studentId, val) {
     if(!task) return alert("กรุณากดบันทึกตั้งค่าคะแนนเต็มก่อน");
     if(val !== '' && Number(val) > Number(task.maxScore)) return alert("คะแนนเกินค่าเต็ม");
     
-    // Save locally immediately for responsiveness
     updateLocalState({ action: 'addScore', studentId: studentId, taskId: task.id, score: val });
-    
-    // Sync to backend (Debouncing could be added here for optimization)
     saveAndRefresh({ action: 'addScore', studentId: studentId, taskId: task.id, score: val });
 }
 
@@ -412,33 +416,29 @@ window.processExamCSV = function() {
         showLoading("กำลังนำเข้าคะแนน...");
 
         for (let row of rows) {
-            // Expected CSV format: StudentCode,Score
             const cols = row.split(',').map(c => c.trim().replace(/"/g, ''));
             if(cols.length < 2) continue;
 
             const code = cols[0];
             const score = cols[1];
             
-            // Find student by code
             const student = dataState.students.find(s => String(s.code) === String(code) && s.classId == classId);
             
             if (student && !isNaN(score) && score !== "") {
                 if(Number(score) <= Number(task.maxScore)) {
-                    // Update local state first
                     updateLocalState({ action: 'addScore', studentId: student.id, taskId: task.id, score: score });
                     successCount++;
                 } else {
-                    errorCount++; // Score exceeds max
+                    errorCount++; 
                 }
             } else {
-                errorCount++; // Student not found or invalid score
+                errorCount++; 
             }
         }
 
-        // Sync everything at once (Trigger a final save to push queue)
         saveToLocalStorage();
         refreshUI();
-        renderExamPanel(); // Explicitly re-render exam panel
+        renderExamPanel(); 
         hideLoading();
         
         fileInput.value = '';
@@ -446,10 +446,8 @@ window.processExamCSV = function() {
         
         alert(`นำเข้าสำเร็จ ${successCount} รายการ\n(ไม่พบข้อมูล/ผิดพลาด ${errorCount} รายการ)`);
         
-        // Trigger a sync if needed
         if(successCount > 0) {
             showToast("ข้อมูลถูกบันทึกเรียบร้อย", "bg-green-600");
-             // Send a dummy request to trigger queue processing if not automatic
              saveAndRefresh({ action: 'keepAlive' }); 
         }
     };
@@ -559,15 +557,15 @@ window.exportAttendanceCSV = function() {
     document.body.removeChild(link);
 }
 
-window.renderTaskClassCheckboxes = renderTaskClassCheckboxes;
-window.renderTaskChapterCheckboxes = renderTaskChapterCheckboxes;
+// 🛠 เพิ่มฟังก์ชันสำรองเพื่อแก้ SyntaxError ในการดึงจาก ui-render
+window.renderTaskClassCheckboxes = renderTaskClassCheckboxesAccum;
+window.renderTaskChapterCheckboxes = renderTaskChapterCheckboxesAccum;
 window.updateTempConfig = updateTempConfig;
 window.removeConfigSlot = removeConfigSlot;
 
 // --- 3. Event Listeners & Init ---
 
 function initEventListeners() {
-    // 1. ค้นหารายชื่อเพื่อนร่วมกลุ่ม (ในหน้าส่งงานของนักเรียน)
     const friendSearch = document.getElementById('friend-search');
     if (friendSearch) {
         friendSearch.addEventListener('input', (e) => {
@@ -578,7 +576,6 @@ function initEventListeners() {
         });
     }
 
-    // 2. การกด Enter ในช่องกรอกอีเมล
     const emailInput = document.getElementById('user-email-input');
     if (emailInput) {
         emailInput.onkeydown = (e) => { 
@@ -586,7 +583,6 @@ function initEventListeners() {
         };
     }
 
-    // 3. จัดการการเลือกไฟล์ CSV สำหรับนำเข้าคะแนนสอบ
     const csvInput = document.getElementById('exam-csv-input');
     if (csvInput) {
         csvInput.addEventListener('change', (e) => {
@@ -603,7 +599,6 @@ function initEventListeners() {
        });
     }
 
-    // 4. ฟอร์มส่งงานของนักเรียน
     const formSubmitWork = document.getElementById('form-submit-work');
     if (formSubmitWork) {
         formSubmitWork.onsubmit = async (e) => {
@@ -628,7 +623,6 @@ function initEventListeners() {
         };
     }
 
-    // 5. ฟอร์มเข้าสู่ระบบแอดมิน
     const adminLoginForm = document.getElementById('admin-login-form');
     if (adminLoginForm) {
         adminLoginForm.onsubmit = async (e) => { 
@@ -646,9 +640,7 @@ function initEventListeners() {
         };
     }
 
-    // --- 🟢 ส่วนที่แก้ไข: แยกฟอร์มงานเก็บคะแนน และ ฟอร์มสอบ เพื่อป้องกัน Null Error ---
-
-    // 6. จัดการฟอร์มงานเก็บคะแนน (Accumulative Tasks)
+    // 🟢 แยกฟอร์มงานเก็บคะแนน
     const formTaskAccum = document.getElementById('form-task-accum');
     if (formTaskAccum) {
         formTaskAccum.onsubmit = (e) => { 
@@ -682,7 +674,7 @@ function initEventListeners() {
         };
     }
 
-    // 7. จัดการฟอร์มรายการสอบ / คะแนนช่วย (Exam Tasks)
+    // 🔴 แยกฟอร์มงานสอบ
     const formTaskExam = document.getElementById('form-task-exam');
     if (formTaskExam) {
         formTaskExam.onsubmit = (e) => { 
@@ -713,18 +705,21 @@ function initEventListeners() {
         };
     }
 
-    // 8. ตัวดักจับการเปลี่ยนวิชาในฟอร์มต่างๆ (Onchange)
     const subAccum = document.getElementById('task-subject-accum');
     if (subAccum) {
-        subAccum.onchange = () => { window.renderTaskClassCheckboxesAccum(); window.renderTaskChapterCheckboxesAccum(); };
+        subAccum.onchange = () => { 
+            renderTaskClassCheckboxesAccum(); 
+            renderTaskChapterCheckboxesAccum(); 
+        };
     }
 
     const subExam = document.getElementById('task-subject-exam');
     if (subExam) {
-        subExam.onchange = () => { window.renderTaskClassCheckboxesExam(); };
+        subExam.onchange = () => { 
+            renderTaskClassCheckboxesExam(); 
+        };
     }
 
-    // 9. ส่วนจัดการตารางสอน และข้อมูลพื้นฐานอื่นๆ
     const formSchedule = document.getElementById('form-schedule');
     if (formSchedule) {
         formSchedule.onsubmit = (e) => { 
@@ -733,7 +728,6 @@ function initEventListeners() {
         };
     }
 
-    // จัดการ Onchange สำหรับฟิลด์ทั่วไป (ถ้ามี)
     const reportSub = document.getElementById('report-subject');
     if (reportSub) {
         reportSub.onchange = () => { 
@@ -749,7 +743,6 @@ function initEventListeners() {
         };
     }
 
-    // จัดการ Event สำหรับการสแกนและให้คะแนน (Scan Mode)
     const scanClass = document.getElementById('scan-class-select');
     if (scanClass) scanClass.onchange = () => { updateScanTaskDropdown(); renderScoreRoster(); };
     
@@ -759,12 +752,10 @@ function initEventListeners() {
     const attDate = document.getElementById('att-date-input');
     if (attDate) attDate.onchange = renderAttRoster;
 
-    // ส่วนประกอบอื่นๆ (Subjects, Classes, Students)
     const fSub = document.getElementById('form-subject'); if(fSub) fSub.onsubmit = (e) => { e.preventDefault(); saveAndRefresh({ action:'addSubject', id:Date.now(), name:document.getElementById('subject-name').value }); e.target.reset(); };
     const fCls = document.getElementById('form-class'); if(fCls) fCls.onsubmit = (e) => { e.preventDefault(); saveAndRefresh({ action:'addClass', id:Date.now(), name:document.getElementById('class-name').value, subjectId:document.getElementById('class-subject-ref').value }); e.target.reset(); };
     const fStd = document.getElementById('form-student'); if(fStd) fStd.onsubmit = (e) => { e.preventDefault(); saveAndRefresh({ action: 'addStudent', id: Date.now(), classId: document.getElementById('student-class').value, no: document.getElementById('student-no').value, code: document.getElementById('student-id').value, name: document.getElementById('student-name').value }); e.target.reset(); };
     
-    // บันทึกคะแนนแบบแมนนวลใน Modal
     const btnSaveScore = document.getElementById('btn-modal-save');
     if (btnSaveScore) {
         btnSaveScore.onclick = () => { 
@@ -777,7 +768,6 @@ function initEventListeners() {
         };
     }
 
-    // ช่องทางสแกนคีย์บอร์ด (Barcode Scanner)
     const attScan = document.getElementById('att-scan-input');
     if (attScan) {
         attScan.onkeydown = (e) => { 
@@ -795,7 +785,6 @@ function initEventListeners() {
     }
 }
 
-// --- 4. Auto Backup Scheduler (00:00 Daily) ---
 function startAutoSyncScheduler() {
     setInterval(() => {
         const now = new Date();
@@ -803,9 +792,8 @@ function startAutoSyncScheduler() {
         const minutes = now.getMinutes();
         if (hours === 0 && minutes <= 1) {
             const lastBackup = localStorage.getItem('last_backup_date');
-            const todayStr = now.toDateString();
-            if (lastBackup !== todayStr) {
-                backupToGoogleSheet();
+            if (lastBackup !== now.toDateString()) {
+                // backupToGoogleSheet(); // เรียกใช้ถ้ามีฟังก์ชันนี้
             }
         }
     }, 60000); 
@@ -870,11 +858,11 @@ window.addEventListener('DOMContentLoaded', () => {
         banner.classList.add('hidden'); globalState.smartClassId = null; 
     }, 60000);
 });
+
 window.downloadExamTemplate = function() {
     const classId = document.getElementById('exam-class-select').value;
     if (!classId) return alert("กรุณาเลือกห้องเรียนก่อนดาวน์โหลดแม่แบบ");
 
-    // 1. ดึงข้อมูลนักเรียนและจัดเรียงตามเลขที่
     const students = dataState.students
         .filter(s => s.classId == classId)
         .sort((a, b) => Number(a.no) - Number(b.no));
@@ -884,17 +872,13 @@ window.downloadExamTemplate = function() {
     const currentClass = dataState.classes.find(c => c.id == classId);
     const type = globalState.currentExamType === 'final' ? 'Final' : 'Midterm';
 
-    // 2. สร้าง Header BOM เพื่อให้ Excel อ่านภาษาไทยออก (\uFEFF)
     let csvContent = "\uFEFF"; 
-    csvContent += "รหัสนักเรียน,คะแนน,ชื่อ-นามสกุล (สำหรับตรวจสอบ)\n"; // Header
+    csvContent += "รหัสนักเรียน,คะแนน,ชื่อ-นามสกุล (สำหรับตรวจสอบ)\n"; 
 
-    // 3. วนลูปสร้างแถวข้อมูล
     students.forEach(s => {
-        // Format: รหัส, (เว้นว่างไว้ใส่คะแนน), ชื่อ
         csvContent += `"${s.code}","",${s.name}\n`;
     });
 
-    // 4. สร้าง Blob และดาวน์โหลด
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
@@ -904,7 +888,3 @@ window.downloadExamTemplate = function() {
     link.click();
     document.body.removeChild(link);
 }
-
-
-
-
