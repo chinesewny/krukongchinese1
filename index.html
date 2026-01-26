@@ -68,6 +68,7 @@
                 <button onclick="switchAdminSubTab('homework')" id="menu-homework" class="menu-btn glass-ios hover:bg-white/10 text-white/70 rounded-2xl py-3 font-bold relative"><i class="fa-solid fa-list-check block text-xl mb-1"></i> ตรวจงาน<span id="badge-homework" class="absolute top-2 right-2 bg-red-600 text-white text-[10px] px-1.5 py-0.5 rounded-full hidden">0</span></button>
                 <button onclick="switchAdminSubTab('attendance')" id="menu-attendance" class="menu-btn glass-ios hover:bg-white/10 text-white/70 rounded-2xl py-3 font-bold"><i class="fa-solid fa-user-check block text-xl mb-1"></i> เช็คชื่อ</button>
                 <button onclick="switchAdminSubTab('material')" id="menu-material" class="menu-btn glass-ios hover:bg-white/10 text-white/70 rounded-2xl py-3 font-bold"><i class="fa-solid fa-book-open block text-xl mb-1"></i> เนื้อหา</button>
+                <button onclick="switchAdminSubTab('exam')" id="menu-exam" class="menu-btn glass-ios hover:bg-white/10 text-white/70 rounded-2xl py-3 font-bold relative"><i class="fa-solid fa-scroll block text-xl mb-1"></i> การสอบ</button>
             </div>
 
             <section id="admin-panel-basic" class="admin-panel hidden glass-ios rounded-3xl p-6">
@@ -226,7 +227,66 @@
                 </div>
                 <div class="overflow-x-auto bg-black/20 rounded-2xl border border-white/10"><table class="min-w-full text-sm text-white/80"><thead class="bg-white/5 text-xs uppercase font-semibold text-white/60"><tr id="report-table-header"></tr></thead><tbody id="report-table-body" class="divide-y divide-white/5"></tbody></table></div>
             </section>
-            
+            <section id="admin-panel-exam" class="admin-panel hidden glass-ios rounded-3xl p-6 flex flex-col gap-6">
+    <div class="flex flex-col md:flex-row items-center justify-between gap-4 border-b border-white/10 pb-4">
+        <div>
+            <h3 class="text-xl font-bold text-white">จัดการสอบ & ตัดเกรด</h3>
+            <p class="text-xs text-white/50">กำหนดคะแนนกลางภาค/ปลายภาค และนำเข้าคะแนน</p>
+        </div>
+        <div class="flex gap-2 bg-black/20 p-1 rounded-xl">
+            <button onclick="setExamTab('midterm')" id="tab-exam-mid" class="px-6 py-2 rounded-lg text-sm font-bold bg-blue-600 text-white shadow-lg transition-all">กลางภาค</button>
+            <button onclick="setExamTab('final')" id="tab-exam-final" class="px-6 py-2 rounded-lg text-sm font-bold text-white/50 hover:text-white transition-all">ปลายภาค</button>
+        </div>
+    </div>
+
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div class="md:col-span-1 flex flex-col gap-4">
+            <div class="bg-white/5 p-5 rounded-2xl border border-white/10">
+                <label class="text-xs text-white/50 mb-1 block">1. เลือกห้องเรียน</label>
+                <select id="exam-class-select" class="w-full glass-input rounded-xl px-4 py-2 text-sm mb-4" onchange="renderExamPanel()"></select>
+                
+                <label class="text-xs text-white/50 mb-1 block">2. ตั้งค่าคะแนนเต็ม (Max)</label>
+                <div class="flex gap-2 mb-4">
+                    <input type="number" id="exam-max-score" class="w-full glass-input rounded-xl px-3 py-2 text-center font-bold text-yellow-400" value="20">
+                    <button onclick="updateExamConfig()" class="btn-yellow px-4 rounded-xl font-bold text-xs shadow-lg">บันทึก</button>
+                </div>
+            </div>
+
+            <div class="bg-blue-600/10 p-5 rounded-2xl border border-blue-500/30">
+                <h4 class="text-sm font-bold text-blue-300 mb-3"><i class="fa-solid fa-file-csv mr-2"></i>นำเข้าคะแนน (CSV)</h4>
+                <p class="text-[10px] text-white/60 mb-2">รูปแบบไฟล์: <code>รหัสนักเรียน, คะแนน</code></p>
+                <input type="file" id="exam-csv-input" accept=".csv" class="hidden">
+                <button onclick="document.getElementById('exam-csv-input').click()" class="w-full py-2 rounded-xl bg-blue-600 text-white font-bold text-xs shadow-lg mb-2 hover:bg-blue-500 transition-all">
+                    เลือกไฟล์ CSV
+                </button>
+                <div id="csv-file-name" class="text-[10px] text-center text-white/40 mb-2">- ยังไม่เลือกไฟล์ -</div>
+                <button onclick="processExamCSV()" id="btn-process-csv" class="w-full py-2 rounded-xl bg-white/10 text-white/50 font-bold text-xs pointer-events-none transition-all">
+                    ยืนยันนำเข้า
+                </button>
+            </div>
+        </div>
+
+        <div class="md:col-span-2 bg-black/20 p-5 rounded-2xl border border-white/10 flex flex-col">
+            <div class="flex justify-between items-center mb-4">
+                <h4 class="font-bold text-white"><i class="fa-solid fa-users-viewfinder mr-2"></i>รายชื่อนักเรียน</h4>
+                <div class="text-xs text-white/50">บันทึกอัตโนมัติเมื่อพิมพ์</div>
+            </div>
+            <div class="overflow-hidden rounded-xl border border-white/5">
+                <table class="w-full text-sm text-left text-white/80">
+                    <thead class="text-xs text-white/50 uppercase bg-white/5">
+                        <tr>
+                            <th class="px-4 py-3 text-center w-16">เลขที่</th>
+                            <th class="px-4 py-3">ชื่อ-นามสกุล</th>
+                            <th class="px-4 py-3 text-center w-32">คะแนน</th>
+                        </tr>
+                    </thead>
+                    <tbody id="exam-table-body" class="divide-y divide-white/5">
+                        </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</section>
             <section id="admin-panel-attendance" class="admin-panel hidden glass-ios rounded-3xl p-6 flex flex-col gap-6"><div id="smart-att-banner" class="hidden bg-gradient-to-r from-blue-900/50 to-blue-600/50 border border-blue-400/30 rounded-2xl p-4 flex items-center justify-between shadow-lg backdrop-blur-md"><div class="flex items-center gap-4"><div class="h-12 w-12 rounded-full bg-white/20 flex items-center justify-center text-2xl animate-pulse"><i class="fa-solid fa-bell"></i></div><div><h3 class="font-bold text-white text-lg">ถึงเวลาสอนแล้ว!</h3><p class="text-blue-200 text-sm">คาบ <span id="smart-period" class="font-bold text-white"></span> : ห้อง <span id="smart-class-name" class="font-bold text-amber-400 text-lg"></span></p></div></div><button onclick="useSmartClass()" class="btn-yellow px-6 py-2 rounded-xl font-bold shadow-lg">เช็คชื่อห้องนี้</button></div><div class="grid grid-cols-1 lg:grid-cols-4 gap-6 min-h-[500px]"><div class="lg:col-span-1 bg-white/5 p-5 rounded-2xl border border-white/10 flex flex-col gap-5"><h3 class="font-bold text-white text-lg border-b border-white/10 pb-2">ควบคุม & ค้นหา</h3><div class="bg-black/30 p-3 rounded-xl mb-2"><label class="text-xs text-white/50 mb-1 block">ค้นหาวันที่ / ลงเวลา</label><input id="att-date-input" type="date" class="w-full glass-input rounded-xl px-3 py-2 text-sm font-mono text-center mb-2"><select id="att-class-select" class="w-full glass-input rounded-xl px-3 py-2 text-sm mb-2 mt-1"></select><div id="att-stats" class="text-center py-2 border-t border-white/10 mt-2"><p class="text-xs text-white/50">สรุปประจำวัน</p><div class="grid grid-cols-4 gap-1 mt-1 text-sm font-bold"><div class="text-green-400"><i class="fa-solid fa-check"></i> <span id="stat-present">0</span></div><div class="text-yellow-400"><i class="fa-solid fa-envelope"></i> <span id="stat-leave">0</span></div><div class="text-red-400"><i class="fa-solid fa-xmark"></i> <span id="stat-absent">0</span></div><div class="text-orange-400"><i class="fa-solid fa-star"></i> <span id="stat-activity">0</span></div></div></div></div><div class="mb-2"><label class="text-xs text-white/50 block mb-1">📷 โหมดสแกน (ตามปุ่มที่เลือก)</label><input id="att-scan-input" type="text" class="w-full glass-input rounded-xl px-4 py-3 text-lg text-center font-bold text-yellow-400 focus:border-yellow-500 outline-none placeholder-white/20" placeholder="ยิงบาร์โค้ด..." autocomplete="off"></div><div class="space-y-3"><button onclick="setAttMode('มา')" id="btn-att-present" class="w-full py-2 rounded-xl border border-green-500/50 bg-green-500/10 text-green-400 font-bold flex justify-between px-4 transition-all"><span>มาเรียน</span> <i class="fa-solid fa-check"></i></button><button onclick="setAttMode('ลา')" id="btn-att-leave" class="w-full py-2 rounded-xl border border-yellow-500/50 bg-yellow-500/10 text-yellow-400 font-bold flex justify-between px-4 transition-all"><span>ลา</span> <i class="fa-solid fa-envelope"></i></button><button onclick="setAttMode('ขาด')" id="btn-att-absent" class="w-full py-2 rounded-xl border border-red-500/50 bg-red-500/10 text-red-400 font-bold flex justify-between px-4 transition-all"><span>ขาด</span> <i class="fa-solid fa-xmark"></i></button><button onclick="setAttMode('กิจกรรม')" id="btn-att-activity" class="w-full py-2 rounded-xl border border-orange-500/50 bg-orange-500/10 text-orange-400 font-bold flex justify-between px-4 transition-all"><span>กิจกรรม</span> <i class="fa-solid fa-star"></i></button></div><div class="mt-auto pt-4 border-t border-white/10"><button onclick="exportAttendanceCSV()" class="w-full py-3 rounded-xl bg-gradient-to-r from-teal-600 to-green-600 text-white font-bold shadow-lg hover:from-teal-500 hover:to-green-500"><i class="fa-solid fa-file-csv mr-2"></i>รายงานเช็คชื่อ (CSV)</button></div></div><div class="lg:col-span-3 bg-black/20 p-5 rounded-2xl border border-white/10 flex flex-col"><div id="att-roster-grid" class="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-5 gap-3 overflow-y-auto max-h-[600px] p-1"></div></div></div></section>
             
             <section id="admin-panel-homework" class="admin-panel hidden glass-ios rounded-3xl p-6"><div id="incoming-list" class="grid grid-cols-1 gap-4"></div></section>
