@@ -5,7 +5,7 @@ import { getThaiDateISO, formatThaiDate, calGrade, showToast, showLoading, hideL
 import { PERIODS } from "./config.js";
 
 // --- Global Functions (Exposed to Window for HTML onclick) ---
-
+window.saveAndRefresh = saveAndRefresh;
 window.switchMainTab = function(t) { 
     document.getElementById('section-admin').classList.add('hidden'); 
     document.getElementById('section-student').classList.add('hidden'); 
@@ -835,4 +835,5 @@ window.downloadExamTemplate = function() {
     link.click();
     document.body.removeChild(link);
 }
+
 
