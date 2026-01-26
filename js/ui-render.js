@@ -26,9 +26,13 @@ function refreshDropdowns() {
     setOpts('sch-class', dataState.classes); 
     setOpts('report-subject', dataState.subjects); 
     setOpts('exam-class-select', dataState.classes);
+    
+    // Dropdowns สำหรับฟอร์มสร้างงานแบบแยกประเภท 3.1 และ 3.2
     setOpts('task-subject-accum', dataState.subjects); 
     setOpts('task-subject-exam', dataState.subjects);  
 }
+
+// --- ฟังก์ชันสำหรับโครงสร้างใหม่ (3.1 และ 3.2) ---
 
 export function renderTaskClassCheckboxesAccum() {
     const subId = document.getElementById('task-subject-accum').value; 
@@ -72,29 +76,37 @@ export function renderTaskClassCheckboxesExam() {
     }); 
 }
 
+// --- 🟢 แก้ปัญหา SyntaxError: เพิ่มฟังก์ชันชื่อเดิมกลับเข้าไปเพื่อรองรับ main.js ---
+
+export function renderTaskClassCheckboxes() { renderTaskClassCheckboxesAccum(); }
+export function renderTaskChapterCheckboxes() { renderTaskChapterCheckboxesAccum(); }
+
 export function renderConfigSlots() {
     const container = document.getElementById('config-slots-container');
     if(!container) return;
     container.innerHTML = '';
     let total = 0;
-    globalState.tempConfig.forEach((score, idx) => {
-        total += Number(score);
-        const div = document.createElement('div');
-        div.className = "flex items-center gap-2 mb-2 animate-fade-in";
-        div.innerHTML = `
-            <span class="text-white text-xs w-8 font-bold">CH.${idx+1}</span>
-            <input type="number" value="${score}" 
-                onchange="window.updateTempConfig(${idx}, this.value)" 
-                class="flex-1 glass-input rounded-lg px-2 py-2 text-center text-sm font-bold text-yellow-400">
-            <button onclick="window.removeConfigSlot(${idx})" class="text-red-400 hover:text-red-300 p-2">
-                <i class="fa-solid fa-trash-can"></i>
-            </button>`;
-        container.appendChild(div);
-    });
+    if (globalState.tempConfig) {
+        globalState.tempConfig.forEach((score, idx) => {
+            total += Number(score);
+            const div = document.createElement('div');
+            div.className = "flex items-center gap-2 mb-2 animate-fade-in";
+            div.innerHTML = `
+                <span class="text-white text-xs w-8 font-bold">CH.${idx+1}</span>
+                <input type="number" value="${score}" 
+                    onchange="window.updateTempConfig(${idx}, this.value)" 
+                    class="flex-1 glass-input rounded-lg px-2 py-2 text-center text-sm font-bold text-yellow-400">
+                <button onclick="window.removeConfigSlot(${idx})" class="text-red-400 hover:text-red-300 p-2">
+                    <i class="fa-solid fa-trash-can"></i>
+                </button>`;
+            container.appendChild(div);
+        });
+    }
     const totalEl = document.getElementById('config-total-score');
     if(totalEl) totalEl.textContent = total;
 }
 
+// ผูกฟังก์ชันเข้ากับ window
 window.renderTaskClassCheckboxesAccum = renderTaskClassCheckboxesAccum;
 window.renderTaskChapterCheckboxesAccum = renderTaskChapterCheckboxesAccum;
 window.renderTaskClassCheckboxesExam = renderTaskClassCheckboxesExam;
@@ -355,12 +367,14 @@ function updateInboxBadge() {
     if(badge) { badge.textContent = count; badge.classList.toggle('hidden', count === 0); } 
 }
 
-// --- 3. Render Functions (Student) ---
+// --- 3. Render Functions (Student Dashboard) ---
 
 export function renderStudentDashboard(studentCode) {
     const studentRecords = dataState.students.filter(s => String(s.code) === String(studentCode));
     if (studentRecords.length === 0) return;
     const mainProfile = studentRecords[0];
+    
+    if (!mainProfile.email || mainProfile.email === "") { window.openEmailModal('student'); }
     
     const nameEl = document.getElementById('std-dash-name');
     if(nameEl) nameEl.textContent = mainProfile.name;
@@ -388,10 +402,63 @@ export function renderStudentDashboard(studentCode) {
             if(att.status == 'มา') p++; else if(att.status == 'ลา') l++; else if(att.status == 'ขาด') a++; else if(att.status == 'กิจกรรม') act++; 
         });
 
+        // รายการเนื้อหา
+        const subjectMaterials = dataState.materials.filter(m => m.subjectId == subj.id);
+        let matHTML = '';
+        if (subjectMaterials.length > 0) {
+            matHTML = `<div class="mt-4 border-t border-white/10 pt-4"><h4 class="text-[10px] font-bold text-white/40 mb-2 uppercase tracking-widest">📚 เนื้อหาบทเรียน</h4><div class="grid grid-cols-1 gap-2">`;
+            subjectMaterials.forEach(m => {
+                matHTML += `<a href="${m.link}" target="_blank" class="bg-white/5 p-2 rounded-lg flex items-center justify-between hover:bg-white/10 border border-white/5"><span class="text-xs text-white/80 truncate">${m.title}</span><i class="fa-solid fa-arrow-up-right-from-square text-[10px] text-white/30"></i></a>`;
+            });
+            matHTML += `</div></div>`;
+        }
+
         const card = document.createElement('div');
         card.className = "flex flex-col gap-6 p-5 bg-gradient-to-r from-blue-900/40 to-blue-600/20 rounded-2xl border border-blue-500/30 mb-6 shadow-xl animate-fade-in";
-        card.innerHTML = `<h2 class="text-xl font-bold text-white">${subj.name}</h2><p class="text-blue-200 text-sm">ห้องเรียน: ${currentClass.name} | เกรด: <span class="text-yellow-400 font-bold">${grade}</span></p>`;
-        // เพิ่มส่วนการเช็คชื่อหรืองานค้างตาม Logic ที่ถูกต้องได้ตรงนี้
+        
+        let contentHTML = `
+        <div class="flex flex-col md:flex-row items-center justify-between gap-4 border-b border-white/10 pb-4">
+            <div class="flex items-center gap-4">
+                <div class="w-12 h-12 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-2xl shadow-lg text-white">📚</div>
+                <div><h2 class="text-xl font-bold text-white">${subj.name}</h2><p class="text-blue-200 text-sm">ห้องเรียน: ${currentClass.name} | เกรด: <span class="text-yellow-400 font-bold">${grade}</span></p></div>
+            </div>
+            <div class="flex gap-4 bg-black/20 p-3 rounded-xl">
+                <div class="text-center px-4 border-r border-white/10"><div class="text-[10px] text-white/50 uppercase">กลางภาค</div><div class="mt-1 text-lg text-blue-300 font-bold">${midterm}</div></div>
+                <div class="text-center px-4"><div class="text-[10px] text-white/50 uppercase">ปลายภาค</div><div class="mt-1 text-lg text-red-300 font-bold">${final}</div></div>
+            </div>
+        </div>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div class="glass-ios p-5 rounded-2xl border border-white/10">
+                <h3 class="text-sm font-bold text-white mb-4 flex items-center"><i class="fa-solid fa-user-clock mr-2 text-green-400"></i>การเข้าเรียน</h3>
+                <div class="grid grid-cols-4 gap-2 text-center">
+                    <div class="bg-green-500/10 p-2 rounded-xl border border-green-500/20"><div class="text-xl font-bold text-green-400">${p}</div><div class="text-[9px] text-white/50 uppercase">มา</div></div>
+                    <div class="bg-yellow-500/10 p-2 rounded-xl border border-yellow-500/20"><div class="text-xl font-bold text-yellow-400">${l}</div><div class="text-[9px] text-white/50 uppercase">ลา</div></div>
+                    <div class="bg-red-500/10 p-2 rounded-xl border border-red-500/20"><div class="text-xl font-bold text-red-400">${a}</div><div class="text-[9px] text-white/50 uppercase">ขาด</div></div>
+                    <div class="bg-orange-500/10 p-2 rounded-xl border border-orange-500/20"><div class="text-xl font-bold text-orange-400">${act}</div><div class="text-[9px] text-white/50 uppercase">กิจกรรม</div></div>
+                </div>
+            </div>
+            <div class="glass-ios p-5 rounded-2xl border border-white/10">
+                <h3 class="text-sm font-bold text-white mb-4 flex items-center"><i class="fa-solid fa-list-check mr-2 text-yellow-400"></i>สถานะงาน</h3>
+                <div class="space-y-2 max-h-60 overflow-y-auto pr-1">`;
+
+        const sortedTasks = [...tasks].sort((a,b) => (a.dueDateISO > b.dueDateISO ? 1 : -1));
+        if (sortedTasks.length === 0) { contentHTML += `<div class="text-center text-xs text-white/30 py-4">ไม่มีงานค้าง</div>`; }
+
+        sortedTasks.forEach(t => {
+            const sc = dataState.scores.find(x => x.studentId == s.id && x.taskId == t.id);
+            const submission = dataState.submissions.find(x => x.studentId == s.id && x.taskId == t.id);
+            const isLate = t.dueDateISO < today;
+            
+            let bg = "bg-white/5"; let st = `<span class="text-[10px] text-white/30">รอส่ง</span>`;
+            if (sc) { bg="bg-green-500/10"; st=`<span class="text-[10px] text-green-400 font-bold">ตรวจแล้ว (${sc.score})</span>`; }
+            else if (submission) { bg="bg-blue-500/10"; st=`<span class="text-[10px] text-blue-300">รอตรวจ</span>`; }
+            else if (isLate) { bg="bg-red-500/10"; st=`<span class="text-[10px] text-red-400 font-bold">เลยกำหนด</span>`; }
+
+            contentHTML += `<div class="flex items-center justify-between p-2 rounded-lg border border-white/5 ${bg}"><span class="text-xs text-white truncate flex-1 mr-2">${t.name}</span>${st}</div>`;
+        });
+        
+        contentHTML += `</div></div></div> ${matHTML}`; 
+        card.innerHTML = contentHTML; 
         container.appendChild(card);
     });
 }
