@@ -6,6 +6,7 @@ export let dataState = {
 
 export const globalState = {
     scoreMode: 'manual',
+    currentExamType: 'midterm',
     attMode: null,
     pendingScore: null,
     smartClassId: null,
