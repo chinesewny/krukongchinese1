@@ -125,31 +125,60 @@ async function processSheetQueue() {
 }
 
 // ฟังก์ชันสำหรับ Backup ข้อมูลทั้งหมดไปยัง Google Sheet
+// ในไฟล์ js/firebase-service.js
+
 export async function backupToGoogleSheet() {
-    showLoading("Backing up to Sheet...");
-    updateSyncUI('Backing up...', 'yellow');
+    console.log("Starting Backup to Google Sheet...");
+    
+    // 1. เตรียมข้อมูลที่จะส่ง (Payload)
+    // ดึงข้อมูลล่าสุดจาก dataState โดยตรงเพื่อให้แน่ใจว่าเป็นปัจจุบันที่สุด
+    const payload = {
+        action: 'backup', // บอก Server ว่านี่คือการสำรองข้อมูล
+        timestamp: new Date().toLocaleString("en-US", { timeZone: "Asia/Bangkok" }),
+        data: {
+            students: dataState.students,
+            scores: dataState.scores,
+            tasks: dataState.tasks,
+            // 🟢 ส่วนสำคัญ: ตรวจสอบว่าส่งข้อมูลการเช็คชื่อครบถ้วน
+            attendance: dataState.attendance.map(a => ({
+                id: a.id || `${a.studentId}_${a.date}`,
+                studentId: a.studentId,
+                classId: a.classId,
+                date: a.date,   // ต้องเป็น YYYY-MM-DD
+                status: a.status,
+                timestamp: a.timestamp || new Date().toISOString()
+            }))
+        }
+    };
+
+    // 2. ตรวจสอบว่ามี URL ของ Script หรือยัง
+    const SCRIPT_URL = "URL_ของ_GOOGLE_APPS_SCRIPT_ของคุณ"; 
+    // **สำคัญ:** อย่าลืมเปลี่ยนตรงนี้เป็น URL จริงของคุณ (ที่ลงท้ายด้วย /exec)
+
+    if (SCRIPT_URL === "URL_ของ_GOOGLE_APPS_SCRIPT_ของคุณ") {
+        alert("กรุณาใส่ URL ของ Google Apps Script ในไฟล์ firebase-service.js ก่อนครับ");
+        return;
+    }
 
     try {
-        const payload = {
-            action: 'backup',
-            data: dataState,
-            timestamp: new Date().toISOString()
-        };
-
-        await fetch(GOOGLE_SCRIPT_URL, {
+        // 3. ส่งข้อมูลไปยัง Google Sheet
+        const response = await fetch(SCRIPT_URL, {
             method: 'POST',
+            mode: 'no-cors', // สำคัญ: Google Script บังคับใช้ no-cors ในบางกรณี
+            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(payload)
         });
 
-        console.log("✅ Manual Backup Success");
-        updateSyncUI('Online (Backed Up)', 'green');
-        showToast("Backup successful!", "bg-green-600");
-
+        // 4. บันทึกวันที่ Backup ล่าสุดลงเครื่อง
+        const todayStr = new Date(new Date().toLocaleString("en-US", { timeZone: "Asia/Bangkok" })).toDateString();
+        localStorage.setItem('last_backup_date', todayStr);
+        
+        console.log("Backup command sent successfully.");
+        // เนื่องจาก no-cors เราจะเช็ค response.ok ไม่ได้ แต่ถ้ารหัสผ่านบรรทัดนี้มาได้ถือว่าส่งออกแล้ว
+        
     } catch (error) {
-        console.error("❌ Backup Failed:", error);
-        updateSyncUI('Backup Failed', 'red');
-        showToast("Backup failed. Check console.", "bg-red-600");
-    } finally {
-        hideLoading();
+        console.error("Backup Failed:", error);
+        alert("เกิดข้อผิดพลาดในการสำรองข้อมูล: " + error.message);
     }
 }
+
