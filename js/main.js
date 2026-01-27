@@ -1,5 +1,4 @@
-// 🟢 เพิ่ม backupToGoogleSheet ในการ import
-import { syncData, saveAndRefresh, backupToGoogleSheet } from './firebase-service.js';
+import { syncData, saveAndRefresh, backupToGoogleSheet, restoreFromGoogleSheet } from './firebase-service.js';
 import { dataState, globalState, loadFromLocalStorage, updateLocalState, saveToLocalStorage } from "./state.js";
 import { 
     refreshUI, 
@@ -19,11 +18,10 @@ import {
 import { getThaiDateISO, formatThaiDate, calGrade, showToast, showLoading, hideLoading, calculateScores } from "./utils.js";
 import { PERIODS } from "./config.js";
 
-// --- Global Functions (Exposed to Window for HTML onclick) ---
+// --- Global Functions (Exposed to Window) ---
 window.saveAndRefresh = saveAndRefresh;
-window.handleRestoreFromSheet = restoreFromGoogleSheet;
 
-// 🛠 ฟังก์ชันสลับแท็บหลัก
+// 🛠 1. ฟังก์ชันสลับแท็บ (Tab Switching)
 window.switchMainTab = function(t) { 
     document.getElementById('section-admin').classList.add('hidden'); 
     document.getElementById('section-student').classList.add('hidden'); 
@@ -39,9 +37,8 @@ window.switchMainTab = function(t) {
         btnS.className="px-6 py-2 rounded-full text-sm font-bold bg-white text-blue-900 shadow-lg transition-all"; 
         btnA.className="px-6 py-2 rounded-full text-sm font-bold text-white/50 hover:text-white transition-all"; 
     }
-}
+};
 
-// 🛠 ฟังก์ชันสลับเมนูย่อยของ Admin
 window.switchAdminSubTab = function(t) {
     document.querySelectorAll('.admin-panel').forEach(p=>p.classList.add('hidden')); 
     document.getElementById(`admin-panel-${t}`).classList.remove('hidden'); 
@@ -50,12 +47,8 @@ window.switchAdminSubTab = function(t) {
     const activeBtn = document.getElementById(`menu-${t}`); 
     if(activeBtn) activeBtn.className="menu-btn btn-blue rounded-2xl py-3 font-bold shadow-lg text-white"; 
     
-    if(t === 'exam') {
-        renderExamPanel();
-    } else {
-        refreshUI();
-    }
-}
+    if(t === 'exam') renderExamPanel(); else refreshUI();
+};
 
 window.handleLogout = function(force=false) {
     if(force || confirm("ออกจากระบบ?")) { 
@@ -65,7 +58,7 @@ window.handleLogout = function(force=false) {
         localStorage.removeItem('current_student_code'); 
         setTimeout(() => location.reload(), 500);
     } 
-}
+};
 
 window.handleStudentLogin = async function() {
     const inputId = document.getElementById('student-login-id').value.trim();
@@ -86,11 +79,11 @@ window.handleStudentLogin = async function() {
         renderStudentDashboard(student.code);
         showToast(`ยินดีต้อนรับ ${student.name}`);
     } else {
-        showToast("ไม่พบรายชื่อนี้ในระบบ", "bg-red-600 border-red-400", "fa-solid fa-circle-xmark text-2xl");
+        showToast("ไม่พบรายชื่อนี้ในระบบ", "bg-red-600 border-red-400");
     }
-}
+};
 
-// --- Email Modal Functions ---
+// --- 2. Email & Config Functions ---
 window.openEmailModal = function(role) {
     document.getElementById('email-modal').classList.remove('hidden');
     document.getElementById('email-modal-role').value = role;
@@ -100,7 +93,7 @@ window.openEmailModal = function(role) {
     else { const code = localStorage.getItem('current_student_code'); const s = dataState.students.find(x => x.code == code); if(s && s.email) currentEmail = s.email; }
     document.getElementById('user-email-input').value = currentEmail;
     if (!currentEmail) { closeBtn.classList.add('hidden'); } else { closeBtn.classList.remove('hidden'); }
-}
+};
 
 window.saveUserEmail = async function() {
     const emailInput = document.getElementById('user-email-input');
@@ -118,56 +111,35 @@ window.saveUserEmail = async function() {
         } else {
             const code = localStorage.getItem('current_student_code');
             const s = dataState.students.find(x => x.code == code);
-            if (s) {
-                payload.studentId = s.id;
-                await saveAndRefresh(payload);
-            } else {
-                throw new Error("Student not found");
-            }
+            if (s) { payload.studentId = s.id; await saveAndRefresh(payload); } 
+            else { throw new Error("Student not found"); }
         }
         document.getElementById('email-modal').classList.add('hidden');
         showToast("บันทึกข้อมูลเรียบร้อย");
-    } catch (error) {
-        alert("บันทึกไม่สำเร็จ: " + error.message);
-    } finally {
-        hideLoading();
-    }
-}
+    } catch (error) { alert("บันทึกไม่สำเร็จ: " + error.message); } 
+    finally { hideLoading(); }
+};
 
-// --- Subject Config Functions ---
 window.openSubjectConfig = function(subjectId) {
     document.getElementById('subject-config-modal').classList.remove('hidden');
     document.getElementById('config-subject-id').value = subjectId;
     const sub = dataState.subjects.find(s => s.id == subjectId);
     document.getElementById('config-subject-name').textContent = sub ? sub.name : '-';
-    
     globalState.tempConfig = (sub && sub.scoreConfig && sub.scoreConfig.length > 0) ? [...sub.scoreConfig] : [10,10,10,10,10];
     renderConfigSlots();
-}
+};
 
-window.addConfigSlot = function() {
-    globalState.tempConfig.push(10);
-    renderConfigSlots();
-}
-
-window.removeConfigSlot = function(idx) {
-    globalState.tempConfig.splice(idx, 1);
-    renderConfigSlots();
-}
-
-window.updateTempConfig = function(idx, val) {
-    globalState.tempConfig[idx] = Number(val);
-    renderConfigSlots();
-}
-
+window.addConfigSlot = function() { globalState.tempConfig.push(10); renderConfigSlots(); };
+window.removeConfigSlot = function(idx) { globalState.tempConfig.splice(idx, 1); renderConfigSlots(); };
+window.updateTempConfig = function(idx, val) { globalState.tempConfig[idx] = Number(val); renderConfigSlots(); };
 window.saveSubjectConfig = function() {
     const subId = document.getElementById('config-subject-id').value;
     saveAndRefresh({ action: 'updateSubjectConfig', id: subId, config: globalState.tempConfig });
     document.getElementById('subject-config-modal').classList.add('hidden');
     showToast("บันทึกโครงสร้างคะแนนแล้ว");
-}
+};
 
-// --- Score & Attendance Functions ---
+// --- 3. Score & Attendance Functions ---
 window.setScoreMode = function(m) { 
     globalState.scoreMode = m; 
     document.querySelectorAll('.btn-score').forEach(b => { 
@@ -177,40 +149,33 @@ window.setScoreMode = function(m) {
     if(m=='manual') document.getElementById('btn-score-manual').classList.add('btn-score-active'); 
     else document.getElementById('btn-score-manual').classList.remove('btn-score-active'); 
     document.getElementById('scan-score-input').focus(); 
-}
+};
 
 window.setAttMode = function(mode) {
     globalState.attMode = mode; 
-    
     ['present','leave','absent','activity'].forEach(t => { 
         const el = document.getElementById(`btn-att-${t}`);
         if(el) el.classList.remove(`btn-att-active-${t}`); 
     });
-    
     let btnMap = { 'มา': 'present', 'ลา': 'leave', 'ขาด': 'absent', 'กิจกรรม': 'activity' };
     let btnId = btnMap[mode];
-    
-    if(btnId) {
-        const activeBtn = document.getElementById(`btn-att-${btnId}`);
-        if(activeBtn) activeBtn.classList.add(`btn-att-active-${btnId}`);
-    }
-    
+    if(btnId) document.getElementById(`btn-att-${btnId}`).classList.add(`btn-att-active-${btnId}`);
     document.getElementById('att-scan-input').focus();
     showToast(`โหมดเช็คชื่อ: ${mode}`, "bg-blue-600");
-}
+};
 
 window.closeScoreModal = function() {
     document.getElementById('score-modal').classList.add('hidden');
     document.getElementById('scan-score-input').value = '';
     setTimeout(()=>document.getElementById('scan-score-input').focus(), 100);
-}
+};
 
 window.useSmartClass = function() { 
     if(globalState.smartClassId) { 
         document.getElementById('att-class-select').value = globalState.smartClassId; 
         renderAttRoster(); 
     } 
-}
+};
 
 window.searchIndividual = function(keyword) {
     const container = document.getElementById('individual-search-results');
@@ -248,9 +213,7 @@ window.searchIndividual = function(keyword) {
                 document.getElementById('ind-att-leave').textContent = l;
                 document.getElementById('ind-att-absent').textContent = a;
                 document.getElementById('ind-att-activity').textContent = act;
-                
-                const absentDiv = document.getElementById('ind-absent-dates');
-                absentDiv.innerHTML = aDates.length > 0 ? aDates.map(d => `<span class="inline-block bg-red-500/20 text-red-200 px-1.5 py-0.5 rounded text-[10px] mr-1 mb-1">${d}</span>`).join('') : '<span class="text-green-400/60 text-xs">ไม่มีประวัติการขาดเรียน</span>';
+                document.getElementById('ind-absent-dates').innerHTML = aDates.length > 0 ? aDates.map(d => `<span class="inline-block bg-red-500/20 text-red-200 px-1.5 py-0.5 rounded text-[10px] mr-1 mb-1">${d}</span>`).join('') : '<span class="text-green-400/60 text-xs">ไม่มีประวัติการขาดเรียน</span>';
 
                 const allTasks = tasks;
                 const submittedIds = [];
@@ -279,16 +242,14 @@ window.searchIndividual = function(keyword) {
                 } else {
                     missingListDiv.innerHTML = `<div class="text-center py-2 text-green-400 text-xs"><i class="fa-solid fa-check-circle mr-1"></i>ส่งงานครบแล้ว</div>`;
                 }
-
                 container.classList.add('hidden'); 
                 document.getElementById('individual-search').value = '';
             };
             container.appendChild(div);
         });
     } else { container.classList.add('hidden'); }
-}
+};
 
-// --- Submission Functions ---
 window.openSubmitModal = function(taskId, studentId, taskName) {
     document.getElementById('submit-modal').classList.remove('hidden');
     document.getElementById('submit-task-id').value = taskId;
@@ -308,7 +269,7 @@ window.openSubmitModal = function(taskId, studentId, taskName) {
             container.appendChild(div);
         });
     }
-}
+};
 
 window.submitGroupGrade = async function(studentIdsStr, taskId, max, inputId) { 
     const val = document.getElementById(inputId).value; 
@@ -319,10 +280,10 @@ window.submitGroupGrade = async function(studentIdsStr, taskId, max, inputId) {
     refreshUI();
     sids.forEach(sid => saveAndRefresh({ action:'addScore', studentId: sid, taskId: taskId, score: val })); 
     showToast(`บันทึกคะแนนกลุ่มเรียบร้อย`, "bg-green-600");
-}
+};
 
 window.returnGroupWork = async function(studentIdsStr, taskId) { 
-    const reason = prompt("ระบุเหตุผลที่ส่งคืน (สมาชิกทุกคนจะเห็นข้อความนี้):"); 
+    const reason = prompt("ระบุเหตุผลที่ส่งคืน:"); 
     if(reason) { 
         const sids = studentIdsStr.split(','); 
         for (const sid of sids) updateLocalState({ action:'returnForRevision', studentId: sid, taskId: taskId, comment: reason }); 
@@ -330,16 +291,13 @@ window.returnGroupWork = async function(studentIdsStr, taskId) {
         sids.forEach(sid => saveAndRefresh({ action:'returnForRevision', studentId: sid, taskId: taskId, comment: reason })); 
         showToast("ส่งคืนงานเรียบร้อย", "bg-yellow-600");
     } 
-}
+};
 
-// --- NEW EXAM FUNCTIONS (Import CSV & Grading) ---
-
+// --- 4. Exam & CSV Functions ---
 window.setExamTab = function(type) {
     globalState.currentExamType = type;
-    
     const btnMid = document.getElementById('tab-exam-mid');
     const btnFinal = document.getElementById('tab-exam-final');
-    
     if(type === 'midterm') {
         btnMid.className = "px-6 py-2 rounded-lg text-sm font-bold bg-blue-600 text-white shadow-lg transition-all";
         btnFinal.className = "px-6 py-2 rounded-lg text-sm font-bold text-white/50 hover:text-white transition-all";
@@ -347,9 +305,8 @@ window.setExamTab = function(type) {
         btnFinal.className = "px-6 py-2 rounded-lg text-sm font-bold bg-red-600 text-white shadow-lg transition-all";
         btnMid.className = "px-6 py-2 rounded-lg text-sm font-bold text-white/50 hover:text-white transition-all";
     }
-    
     renderExamPanel();
-}
+};
 
 window.renderExamPanel = renderExamPanel;
 
@@ -357,12 +314,10 @@ window.updateExamConfig = async function() {
     const classId = document.getElementById('exam-class-select').value;
     const max = document.getElementById('exam-max-score').value;
     const type = globalState.currentExamType || 'midterm';
-    
     if(!classId) return alert("กรุณาเลือกห้องเรียน");
     
     let task = dataState.tasks.find(t => t.classId == classId && t.category === type);
     const subId = dataState.classes.find(c => c.id == classId).subjectId;
-    
     const name = type === 'midterm' ? 'สอบกลางภาค' : 'สอบปลายภาค';
     
     if(task) {
@@ -371,42 +326,31 @@ window.updateExamConfig = async function() {
         saveToLocalStorage(); 
     } else {
         await saveAndRefresh({
-            action: 'addTask',
-            id: Date.now(),
-            classIds: [classId],
-            subjectId: subId,
-            category: type,
-            chapter: [],
-            name: name,
-            maxScore: max,
-            dueDateISO: getThaiDateISO()
+            action: 'addTask', id: Date.now(), classIds: [classId], subjectId: subId,
+            category: type, chapter: [], name: name, maxScore: max, dueDateISO: getThaiDateISO()
         });
         showToast("สร้างรายการสอบเรียบร้อย");
     }
     renderExamPanel();
-}
+};
 
 window.saveExamScore = function(studentId, val) {
     const classId = document.getElementById('exam-class-select').value;
     const type = globalState.currentExamType || 'midterm';
     const task = dataState.tasks.find(t => t.classId == classId && t.category === type);
-    
     if(!task) return alert("กรุณากดบันทึกตั้งค่าคะแนนเต็มก่อน");
     if(val !== '' && Number(val) > Number(task.maxScore)) return alert("คะแนนเกินค่าเต็ม");
-    
     updateLocalState({ action: 'addScore', studentId: studentId, taskId: task.id, score: val });
     saveAndRefresh({ action: 'addScore', studentId: studentId, taskId: task.id, score: val });
-}
+};
 
 window.processExamCSV = function() {
     const fileInput = document.getElementById('exam-csv-input');
     const file = fileInput.files[0];
     if (!file) return;
-
     const classId = document.getElementById('exam-class-select').value;
     const type = globalState.currentExamType || 'midterm';
     const task = dataState.tasks.find(t => t.classId == classId && t.category === type);
-
     if(!task) return alert("ไม่พบรายการสอบ กรุณาตั้งค่าคะแนนเต็มก่อน");
 
     const reader = new FileReader();
@@ -415,64 +359,45 @@ window.processExamCSV = function() {
         const rows = text.split('\n');
         let successCount = 0;
         let errorCount = 0;
-
         showLoading("กำลังนำเข้าคะแนน...");
-
         for (let row of rows) {
             const cols = row.split(',').map(c => c.trim().replace(/"/g, ''));
             if(cols.length < 2) continue;
-
             const code = cols[0];
             const score = cols[1];
-            
             const student = dataState.students.find(s => String(s.code) === String(code) && s.classId == classId);
-            
             if (student && !isNaN(score) && score !== "") {
                 if(Number(score) <= Number(task.maxScore)) {
                     updateLocalState({ action: 'addScore', studentId: student.id, taskId: task.id, score: score });
                     successCount++;
-                } else {
-                    errorCount++; 
-                }
-            } else {
-                errorCount++; 
-            }
+                } else errorCount++; 
+            } else errorCount++; 
         }
-
         saveToLocalStorage();
         refreshUI();
         renderExamPanel(); 
         hideLoading();
-        
         fileInput.value = '';
         document.getElementById('csv-file-name').textContent = "- ยังไม่เลือกไฟล์ -";
-        
         alert(`นำเข้าสำเร็จ ${successCount} รายการ\n(ไม่พบข้อมูล/ผิดพลาด ${errorCount} รายการ)`);
-        
         if(successCount > 0) {
             showToast("ข้อมูลถูกบันทึกเรียบร้อย", "bg-green-600");
              saveAndRefresh({ action: 'keepAlive' }); 
         }
     };
     reader.readAsText(file);
-}
+};
 
-// --- Report Functions ---
-window.printOfficialReport = function() {
-    window.print();
-}
+window.printOfficialReport = function() { window.print(); };
 
-// --- CSV Exports ---
 window.exportGradeCSV = function() {
     const classId = document.getElementById('report-class').value;
     if (!classId) return alert("กรุณาเลือกห้องเรียนก่อนดาวน์โหลด CSV");
-    
     const mode = document.querySelector('input[name="reportType"]:checked').value;
     const currentClass = dataState.classes.find(c => c.id == classId);
     const subj = dataState.subjects.find(s => s.id == currentClass.subjectId);
     const students = dataState.students.filter(s => s.classId == classId).sort((a, b) => Number(a.no) - Number(b.no));
     const tasks = dataState.tasks.filter(t => t.classId == classId);
-    
     let csvContent = "\uFEFF"; 
     
     if (mode === 'summary') {
@@ -481,7 +406,6 @@ window.exportGradeCSV = function() {
         config.forEach((m, i) => headerRow.push(`CH${i+1} (${m})`));
         headerRow.push("กลางภาค", "ปลายภาค", "รวม", "เกรด");
         csvContent += headerRow.join(",") + "\n";
-        
         students.forEach(s => {
             const { chapScores, midterm, final, total } = calculateScores(s.id, classId, tasks);
             let row = [s.no, `"${s.code}"`, `"${s.name}"`];
@@ -495,7 +419,6 @@ window.exportGradeCSV = function() {
         accumTasks.forEach(t => headerRow.push(`"${t.name} (${t.maxScore})"`));
         headerRow.push("กลางภาค", "ปลายภาค", "รวม", "เกรด");
         csvContent += headerRow.join(",") + "\n";
-        
         students.forEach(s => {
             let row = [s.no, `"${s.code}"`, `"${s.name}"`];
             accumTasks.forEach(t => {
@@ -507,7 +430,6 @@ window.exportGradeCSV = function() {
             csvContent += row.join(",") + "\n";
         });
     }
-    
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
@@ -516,40 +438,33 @@ window.exportGradeCSV = function() {
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
-}
+};
 
 window.exportAttendanceCSV = function() {
     const cid = document.getElementById('att-class-select').value;
     if (!cid) return alert("กรุณาเลือกห้องเรียนก่อน");
-
     const currentClass = dataState.classes.find(c => c.id == cid);
     const students = dataState.students.filter(s => s.classId == cid).sort((a, b) => Number(a.no) - Number(b.no));
     const uniqueDates = [...new Set(dataState.attendance.filter(a => a.classId == cid).map(a => a.date))].sort();
-
     let csvContent = "\uFEFF"; 
     let headerRow = ["เลขที่", "รหัสนักเรียน", "ชื่อ-นามสกุล"];
-    
     uniqueDates.forEach(d => headerRow.push(`"${formatThaiDate(d)}"`));
     headerRow.push("มา", "ลา", "ขาด", "กิจกรรม", "เปอร์เซ็นต์การมา");
     csvContent += headerRow.join(",") + "\n";
-
     students.forEach(s => {
         let row = [s.no, `"${s.code}"`, `"${s.name}"`];
         let p=0, l=0, a=0, act=0;
-
         uniqueDates.forEach(d => {
             const log = dataState.attendance.find(att => att.studentId == s.id && att.date == d);
             const status = log ? log.status : "-";
             row.push(status);
             if(status=='มา') p++; else if(status=='ลา') l++; else if(status=='ขาด') a++; else if(status=='กิจกรรม') act++;
         });
-
         const totalDays = uniqueDates.length || 1;
         const percent = Math.round(((p+act)/totalDays)*100);
         row.push(p, l, a, act, `${percent}%`);
         csvContent += row.join(",") + "\n";
     });
-
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
@@ -558,28 +473,40 @@ window.exportAttendanceCSV = function() {
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
-}
+};
 
-// 🛠 เชื่อมต่อฟังก์ชัน UI ที่จำเป็น
-window.renderTaskClassCheckboxes = renderTaskClassCheckboxesAccum;
-window.renderTaskChapterCheckboxes = renderTaskChapterCheckboxesAccum;
-window.updateTempConfig = updateTempConfig;
-window.removeConfigSlot = removeConfigSlot;
-window.updateScanTaskDropdown = updateScanTaskDropdown; 
-window.renderScoreRoster = renderScoreRoster;
+window.downloadExamTemplate = function() {
+    const classId = document.getElementById('exam-class-select').value;
+    if (!classId) return alert("กรุณาเลือกห้องเรียนก่อนดาวน์โหลดแม่แบบ");
+    const students = dataState.students.filter(s => s.classId == classId).sort((a, b) => Number(a.no) - Number(b.no));
+    if (students.length === 0) return alert("ไม่พบรายชื่อนักเรียนในห้องนี้");
+    const currentClass = dataState.classes.find(c => c.id == classId);
+    const type = globalState.currentExamType === 'final' ? 'Final' : 'Midterm';
+    let csvContent = "\uFEFF"; 
+    csvContent += "รหัสนักเรียน,คะแนน,ชื่อ-นามสกุล (สำหรับตรวจสอบ)\n"; 
+    students.forEach(s => { csvContent += `"${s.code}","",${s.name}\n`; });
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.setAttribute("href", url);
+    link.setAttribute("download", `Template_${type}_${currentClass.name}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+};
 
-// 🟢 NEW FUNCTION: Manual Sync Button Logic
+// --- 5. Backup & Restore Functions ---
 window.handleManualBackup = async function() {
     if (confirm("ต้องการตรวจสอบและซิงค์ข้อมูลกับ Google Sheet เดี๋ยวนี้หรือไม่?")) {
         showLoading("กำลังซิงค์ข้อมูล...");
         try {
-            await syncData(); // ดึงข้อมูลล่าสุดจาก Firebase
+            await syncData(); 
             if (typeof backupToGoogleSheet === 'function') {
-                await backupToGoogleSheet(); // ส่งข้อมูลไป Google Sheet (ถ้ามีฟังก์ชันนี้)
+                await backupToGoogleSheet(); 
                 showToast("ซิงค์ข้อมูลกับ Google Sheet เรียบร้อย", "bg-green-600");
             } else {
-                console.warn("backupToGoogleSheet function not found in firebase-service.js");
-                showToast("ดึงข้อมูลล่าสุดเรียบร้อย (ไม่พบฟังก์ชัน Backup)", "bg-blue-600");
+                console.warn("backupToGoogleSheet function not found");
+                showToast("ดึงข้อมูลล่าสุดเรียบร้อย", "bg-blue-600");
             }
         } catch (e) {
             console.error("Sync Error:", e);
@@ -589,10 +516,19 @@ window.handleManualBackup = async function() {
             refreshUI();
         }
     }
-}
+};
 
-// --- 3. Event Listeners & Init ---
+window.handleRestoreFromSheet = restoreFromGoogleSheet;
 
+// เชื่อมต่อ UI-Render
+window.renderTaskClassCheckboxes = renderTaskClassCheckboxesAccum;
+window.renderTaskChapterCheckboxes = renderTaskChapterCheckboxesAccum;
+window.updateTempConfig = updateTempConfig;
+window.removeConfigSlot = removeConfigSlot;
+window.updateScanTaskDropdown = updateScanTaskDropdown; 
+window.renderScoreRoster = renderScoreRoster;
+
+// --- 6. Event Listeners ---
 function initEventListeners() {
     // 1. ค้นหารายชื่อเพื่อน
     const friendSearch = document.getElementById('friend-search');
@@ -605,7 +541,7 @@ function initEventListeners() {
         });
     }
 
-    // 2. การกด Enter บันทึกอีเมล
+    // 2. กด Enter บันทึกอีเมล
     const emailInput = document.getElementById('user-email-input');
     if (emailInput) {
         emailInput.onkeydown = (e) => { 
@@ -685,7 +621,7 @@ function initEventListeners() {
             if(classCbs.length === 0) return alert("กรุณาเลือกห้องเรียน"); 
             if(chapCbs.length === 0) return alert("กรุณาเลือกช่องคะแนน (Chapter)"); 
             
-            // 🟢 ปรับเวลาให้เป็น GMT+7 (ประเทศไทย)
+            // 🟢 เวลาไทย
             const d = new Date(new Date().toLocaleString("en-US", { timeZone: "Asia/Bangkok" }));
             d.setDate(d.getDate() + 7);
             const year = d.getFullYear();
@@ -763,7 +699,7 @@ function initEventListeners() {
         };
     }
 
-    // 11. ให้คะแนน
+    // 11. ให้คะแนน (Scan & Select Task)
     const scanClass = document.getElementById('scan-class-select');
     if (scanClass) {
         scanClass.onchange = () => { 
@@ -789,7 +725,7 @@ function initEventListeners() {
     const fCls = document.getElementById('form-class'); if(fCls) fCls.onsubmit = (e) => { e.preventDefault(); saveAndRefresh({ action:'addClass', id:Date.now(), name:document.getElementById('class-name').value, subjectId:document.getElementById('class-subject-ref').value }); e.target.reset(); };
     const fStd = document.getElementById('form-student'); if(fStd) fStd.onsubmit = (e) => { e.preventDefault(); saveAndRefresh({ action: 'addStudent', id: Date.now(), classId: document.getElementById('student-class').value, no: document.getElementById('student-no').value, code: document.getElementById('student-id').value, name: document.getElementById('student-name').value }); e.target.reset(); };
     
-    // 14. บันทึก Modal
+    // 14. บันทึก Modal (กดปุ่ม)
     const btnSaveScore = document.getElementById('btn-modal-save');
     if (btnSaveScore) {
         btnSaveScore.onclick = () => { 
@@ -802,7 +738,7 @@ function initEventListeners() {
         };
     }
 
-    // 15. สแกนเช็คชื่อ
+    // 15. สแกนเช็คชื่อ (Barcode)
     const attScan = document.getElementById('att-scan-input');
     if (attScan) {
         attScan.onkeydown = (e) => { 
@@ -824,7 +760,7 @@ function initEventListeners() {
         };
     }
 
-    // 16. กด Enter บันทึกคะแนนใน Modal
+    // 🟢 16. กด Enter บันทึกคะแนนในหน้าต่าง Modal ทันที
     const modalScoreInput = document.getElementById('modal-score-input');
     if (modalScoreInput) {
         modalScoreInput.onkeydown = (e) => { 
@@ -868,29 +804,21 @@ function initEventListeners() {
             } 
         };
     }
-}
+} // ปิดฟังก์ชัน initEventListeners อย่างถูกต้อง
 
-// --- 4. Auto Backup Scheduler ---
+// --- 7. Initialization ---
 function startAutoSyncScheduler() {
     setInterval(() => {
-        // 🟢 ตรวจสอบเวลาประเทศไทยสำหรับการ Auto Backup
         const now = new Date(new Date().toLocaleString("en-US", { timeZone: "Asia/Bangkok" }));
-        const hours = now.getHours();
-        const minutes = now.getMinutes();
-        if (hours === 0 && minutes <= 1) {
+        if (now.getHours() === 0 && now.getMinutes() <= 1) {
             const lastBackup = localStorage.getItem('last_backup_date');
-            const todayStr = now.toDateString();
-            if (lastBackup !== todayStr) {
-                // 🟢 Uncomment เพื่อเปิดใช้งาน Auto Backup
-                if (typeof backupToGoogleSheet === 'function') {
-                    backupToGoogleSheet();
-                }
+            if (lastBackup !== now.toDateString()) {
+                if (typeof backupToGoogleSheet === 'function') backupToGoogleSheet();
             }
         }
     }, 60000); 
 }
 
-// --- 5. Main Initialization ---
 window.addEventListener('DOMContentLoaded', () => {
     syncData(); 
     loadFromLocalStorage(); 
@@ -930,19 +858,15 @@ window.addEventListener('DOMContentLoaded', () => {
     
     setInterval(() => {
         if(!dataState.schedules) return; 
-        
-        // 🟢 ตรวจสอบเวลาประเทศไทยสำหรับการเช็คคาบเรียน
         const now = new Date(new Date().toLocaleString("en-US", { timeZone: "Asia/Bangkok" }));
-        const day = now.getDay(); 
-        const timeStr = now.toTimeString().slice(0,5); 
-        
+        const day = now.getDay(); const timeStr = now.toTimeString().slice(0,5); 
         let currentPeriod = PERIODS.find(p => timeStr >= p.start && timeStr <= p.end); 
         const banner = document.getElementById('smart-att-banner'); 
         if(currentPeriod && dataState.schedules) { 
             const match = dataState.schedules.find(s => s.day == day && s.period == currentPeriod.p); 
             if(match) { 
                 const cls = dataState.classes.find(c => c.id == match.classId); 
-                if(cls) { 
+                if(cls && banner) { 
                     banner.classList.remove('hidden'); 
                     document.getElementById('smart-period').textContent = currentPeriod.p; 
                     document.getElementById('smart-class-name').textContent = cls.name; 
@@ -951,38 +875,7 @@ window.addEventListener('DOMContentLoaded', () => {
                 } 
             } 
         } 
-        banner.classList.add('hidden'); globalState.smartClassId = null; 
+        if(banner) banner.classList.add('hidden'); 
+        globalState.smartClassId = null; 
     }, 60000);
 });
-
-window.downloadExamTemplate = function() {
-    const classId = document.getElementById('exam-class-select').value;
-    if (!classId) return alert("กรุณาเลือกห้องเรียนก่อนดาวน์โหลดแม่แบบ");
-
-    const students = dataState.students
-        .filter(s => s.classId == classId)
-        .sort((a, b) => Number(a.no) - Number(b.no));
-
-    if (students.length === 0) return alert("ไม่พบรายชื่อนักเรียนในห้องนี้");
-
-    const currentClass = dataState.classes.find(c => c.id == classId);
-    const type = globalState.currentExamType === 'final' ? 'Final' : 'Midterm';
-
-    let csvContent = "\uFEFF"; 
-    csvContent += "รหัสนักเรียน,คะแนน,ชื่อ-นามสกุล (สำหรับตรวจสอบ)\n"; 
-
-    students.forEach(s => {
-        csvContent += `"${s.code}","",${s.name}\n`;
-    });
-
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.setAttribute("href", url);
-    link.setAttribute("download", `Template_${type}_${currentClass.name}.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    import { syncData, saveAndRefresh, backupToGoogleSheet, restoreFromGoogleSheet } from './firebase-service.js';
-}
-
