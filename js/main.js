@@ -21,6 +21,7 @@ import { PERIODS } from "./config.js";
 
 // --- Global Functions (Exposed to Window for HTML onclick) ---
 window.saveAndRefresh = saveAndRefresh;
+window.handleRestoreFromSheet = restoreFromGoogleSheet;
 
 // 🛠 ฟังก์ชันสลับแท็บหลัก
 window.switchMainTab = function(t) { 
@@ -982,4 +983,6 @@ window.downloadExamTemplate = function() {
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
+    import { syncData, saveAndRefresh, backupToGoogleSheet, restoreFromGoogleSheet } from './firebase-service.js';
 }
+
