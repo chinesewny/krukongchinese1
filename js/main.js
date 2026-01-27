@@ -558,7 +558,7 @@ window.exportAttendanceCSV = function() {
     document.body.removeChild(link);
 }
 
-// 🛠 ฟังก์ชันสำหรับเชื่อมต่อ ui-render
+// 🛠 เชื่อมต่อฟังก์ชัน UI ที่จำเป็น
 window.renderTaskClassCheckboxes = renderTaskClassCheckboxesAccum;
 window.renderTaskChapterCheckboxes = renderTaskChapterCheckboxesAccum;
 window.updateTempConfig = updateTempConfig;
@@ -659,8 +659,15 @@ function initEventListeners() {
             if(!subId) return alert("กรุณาเลือกวิชา");
             if(classCbs.length === 0) return alert("กรุณาเลือกห้องเรียน"); 
             if(chapCbs.length === 0) return alert("กรุณาเลือกช่องคะแนน (Chapter)"); 
-            const d = new Date(); d.setDate(d.getDate() + 7);
-            const dueDate = d.toISOString().slice(0,10);
+            
+            // 🟢 ปรับเวลาให้เป็น GMT+7 (ประเทศไทย)
+            const d = new Date(new Date().toLocaleString("en-US", { timeZone: "Asia/Bangkok" }));
+            d.setDate(d.getDate() + 7);
+            const year = d.getFullYear();
+            const month = String(d.getMonth() + 1).padStart(2, '0');
+            const day = String(d.getDate()).padStart(2, '0');
+            const dueDate = `${year}-${month}-${day}`;
+
             saveAndRefresh({ 
                 action: 'addTask', id: Date.now(), 
                 classIds: Array.from(classCbs).map(c => c.value), 
@@ -836,15 +843,19 @@ function initEventListeners() {
             } 
         };
     }
-} // ปิดฟังก์ชัน initEventListeners อย่างถูกต้อง
+}
 
 // --- 4. Auto Backup Scheduler ---
 function startAutoSyncScheduler() {
     setInterval(() => {
-        const now = new Date();
-        if (now.getHours() === 0 && now.getMinutes() <= 1) {
+        // 🟢 ตรวจสอบเวลาประเทศไทยสำหรับการ Auto Backup
+        const now = new Date(new Date().toLocaleString("en-US", { timeZone: "Asia/Bangkok" }));
+        const hours = now.getHours();
+        const minutes = now.getMinutes();
+        if (hours === 0 && minutes <= 1) {
             const lastBackup = localStorage.getItem('last_backup_date');
-            if (lastBackup !== now.toDateString()) {
+            const todayStr = now.toDateString();
+            if (lastBackup !== todayStr) {
                 // backupToGoogleSheet(); 
             }
         }
@@ -891,10 +902,15 @@ window.addEventListener('DOMContentLoaded', () => {
     
     setInterval(() => {
         if(!dataState.schedules) return; 
-        const now = new Date(); const day = now.getDay(); const timeStr = now.toTimeString().slice(0,5); 
+        
+        // 🟢 ตรวจสอบเวลาประเทศไทยสำหรับการเช็คคาบเรียน
+        const now = new Date(new Date().toLocaleString("en-US", { timeZone: "Asia/Bangkok" }));
+        const day = now.getDay(); 
+        const timeStr = now.toTimeString().slice(0,5); 
+        
         let currentPeriod = PERIODS.find(p => timeStr >= p.start && timeStr <= p.end); 
         const banner = document.getElementById('smart-att-banner'); 
-        if(currentPeriod && banner) { 
+        if(currentPeriod && dataState.schedules) { 
             const match = dataState.schedules.find(s => s.day == day && s.period == currentPeriod.p); 
             if(match) { 
                 const cls = dataState.classes.find(c => c.id == match.classId); 
@@ -906,8 +922,8 @@ window.addEventListener('DOMContentLoaded', () => {
                     return; 
                 } 
             } 
-            banner.classList.add('hidden'); globalState.smartClassId = null;
         } 
+        banner.classList.add('hidden'); globalState.smartClassId = null; 
     }, 60000);
 });
 
