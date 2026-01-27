@@ -152,7 +152,7 @@ export async function backupToGoogleSheet() {
     };
 
     // 2. ตรวจสอบว่ามี URL ของ Script หรือยัง
-    const SCRIPT_URL = "URL_ของ_GOOGLE_APPS_SCRIPT_ของคุณ"; 
+    const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwQNjMSE06u5xO4dtyipa5P-YzoaicppubdwlUgMpaX4L4TUjk3-xY2PRnzhS42AxZe/exec"; 
     // **สำคัญ:** อย่าลืมเปลี่ยนตรงนี้เป็น URL จริงของคุณ (ที่ลงท้ายด้วย /exec)
 
     if (SCRIPT_URL === "URL_ของ_GOOGLE_APPS_SCRIPT_ของคุณ") {
@@ -181,4 +181,5 @@ export async function backupToGoogleSheet() {
         alert("เกิดข้อผิดพลาดในการสำรองข้อมูล: " + error.message);
     }
 }
+
 
