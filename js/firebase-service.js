@@ -184,7 +184,7 @@ export async function backupToGoogleSheet() {
 // ใน js/firebase-service.js (เพิ่มต่อท้าย)
 
 export async function restoreFromGoogleSheet() {
-    const SCRIPT_URL = "URL_ของ_GOOGLE_APPS_SCRIPT_ของคุณ"; // ⚠️ ใส่ URL ใหม่ที่ Deploy แล้ว
+    const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwQNjMSE06u5xO4dtyipa5P-YzoaicppubdwlUgMpaX4L4TUjk3-xY2PRnzhS42AxZe/exec"; // ⚠️ ใส่ URL ใหม่ที่ Deploy แล้ว
 
     if (confirm("⚠️ คำเตือน: การกระทำนี้จะดึงข้อมูลจาก Google Sheet มา 'ทับ' ข้อมูลปัจจุบันทั้งหมดในระบบ\n\nใช้กรณีที่คุณแก้ไขข้อมูลใน Excel/Sheet แล้วต้องการนำเข้าระบบ\n\nยืนยันหรือไม่?")) {
         
@@ -243,5 +243,6 @@ export async function restoreFromGoogleSheet() {
         }
     }
 }
+
 
 
