@@ -1,4 +1,5 @@
-import { syncData, saveAndRefresh } from './firebase-service.js';
+// 🟢 เพิ่ม backupToGoogleSheet ในการ import
+import { syncData, saveAndRefresh, backupToGoogleSheet } from './firebase-service.js';
 import { dataState, globalState, loadFromLocalStorage, updateLocalState, saveToLocalStorage } from "./state.js";
 import { 
     refreshUI, 
@@ -566,6 +567,29 @@ window.removeConfigSlot = removeConfigSlot;
 window.updateScanTaskDropdown = updateScanTaskDropdown; 
 window.renderScoreRoster = renderScoreRoster;
 
+// 🟢 NEW FUNCTION: Manual Sync Button Logic
+window.handleManualBackup = async function() {
+    if (confirm("ต้องการตรวจสอบและซิงค์ข้อมูลกับ Google Sheet เดี๋ยวนี้หรือไม่?")) {
+        showLoading("กำลังซิงค์ข้อมูล...");
+        try {
+            await syncData(); // ดึงข้อมูลล่าสุดจาก Firebase
+            if (typeof backupToGoogleSheet === 'function') {
+                await backupToGoogleSheet(); // ส่งข้อมูลไป Google Sheet (ถ้ามีฟังก์ชันนี้)
+                showToast("ซิงค์ข้อมูลกับ Google Sheet เรียบร้อย", "bg-green-600");
+            } else {
+                console.warn("backupToGoogleSheet function not found in firebase-service.js");
+                showToast("ดึงข้อมูลล่าสุดเรียบร้อย (ไม่พบฟังก์ชัน Backup)", "bg-blue-600");
+            }
+        } catch (e) {
+            console.error("Sync Error:", e);
+            showToast("เกิดข้อผิดพลาดในการซิงค์", "bg-red-600");
+        } finally {
+            hideLoading();
+            refreshUI();
+        }
+    }
+}
+
 // --- 3. Event Listeners & Init ---
 
 function initEventListeners() {
@@ -856,7 +880,10 @@ function startAutoSyncScheduler() {
             const lastBackup = localStorage.getItem('last_backup_date');
             const todayStr = now.toDateString();
             if (lastBackup !== todayStr) {
-                // backupToGoogleSheet(); 
+                // 🟢 Uncomment เพื่อเปิดใช้งาน Auto Backup
+                if (typeof backupToGoogleSheet === 'function') {
+                    backupToGoogleSheet();
+                }
             }
         }
     }, 60000); 
