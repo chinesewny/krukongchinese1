@@ -59,9 +59,11 @@
         <p class="text-[10px] text-green-400 font-bold">
             <i class="fa-solid fa-wifi mr-1"></i><span>Online</span>
             
-            <button onclick="handleManualBackup()" class="ml-2 px-2 py-0.5 rounded bg-white/10 hover:bg-white/20 text-[9px] text-white border border-white/5 transition-all">
-                <i class="fa-solid fa-rotate mr-1"></i>Sync
-            </button>
+           <button onclick="handleManualBackup()" class="...">Sync ไป Sheet</button>
+
+<button onclick="handleRestoreFromSheet()" class="ml-1 px-2 py-0.5 rounded bg-red-500/20 hover:bg-red-500/40 text-[9px] text-red-200 border border-red-500/30 transition-all" title="ระวัง! ข้อมูลในเว็บจะหายและแทนที่ด้วย Sheet">
+    <i class="fa-solid fa-cloud-arrow-down mr-1"></i>กู้คืน
+</button>
             
         </p>
     </div>
@@ -479,4 +481,5 @@
   <script type="module" src="js/main.js"></script>
  </body>
 </html>
+
 
