@@ -1,12 +1,13 @@
 import { dataState } from "./state.js";
 
-export function getThaiDateISO() { 
-    const d=new Date(); 
-    const u=d.getTime()+(d.getTimezoneOffset()*60000); 
-    const b=new Date(u+(7*3600000)); 
-    return b.toISOString().slice(0,10); 
+export function getThaiDateISO() {
+    // ดึงเวลาปัจจุบันตามโซนไทย (Asia/Bangkok)
+    const now = new Date(new Date().toLocaleString("en-US", { timeZone: "Asia/Bangkok" }));
+    const year = now.getFullYear();
+    const month = String(now.getMonth() + 1).padStart(2, '0');
+    const day = String(now.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
 }
-
 export function formatThaiDate(dateString) { 
     if (!dateString) return "-"; 
     const date = new Date(dateString); 
@@ -163,4 +164,5 @@ export function calculateScores(studentId, classId, tasks) {
         finalHelp: finalHelp
     };
 }
+
 
