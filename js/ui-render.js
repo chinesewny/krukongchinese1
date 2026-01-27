@@ -373,12 +373,14 @@ function updateInboxBadge() {
 }
 
 // --- 3. Render Functions (Student Dashboard) ---
+// --- แก้ไขฟังก์ชันนี้ใน js/ui-render.js ---
 
 export function renderStudentDashboard(studentCode) {
     const studentRecords = dataState.students.filter(s => String(s.code) === String(studentCode));
     if (studentRecords.length === 0) return;
     const mainProfile = studentRecords[0];
     
+    // ตรวจสอบอีเมล
     if (!mainProfile.email || mainProfile.email === "") { window.openEmailModal('student'); }
     
     const nameEl = document.getElementById('std-dash-name');
@@ -407,7 +409,7 @@ export function renderStudentDashboard(studentCode) {
             if(att.status == 'มา') p++; else if(att.status == 'ลา') l++; else if(att.status == 'ขาด') a++; else if(att.status == 'กิจกรรม') act++; 
         });
 
-        // รายการเนื้อหา
+        // ส่วนแสดงเนื้อหาบทเรียน
         const subjectMaterials = dataState.materials.filter(m => m.subjectId == subj.id);
         let matHTML = '';
         if (subjectMaterials.length > 0) {
@@ -454,12 +456,30 @@ export function renderStudentDashboard(studentCode) {
             const submission = dataState.submissions.find(x => x.studentId == s.id && x.taskId == t.id);
             const isLate = t.dueDateISO < today;
             
-            let bg = "bg-white/5"; let st = `<span class="text-[10px] text-white/30">รอส่ง</span>`;
-            if (sc) { bg="bg-green-500/10"; st=`<span class="text-[10px] text-green-400 font-bold">ตรวจแล้ว (${sc.score})</span>`; }
-            else if (submission) { bg="bg-blue-500/10"; st=`<span class="text-[10px] text-blue-300">รอตรวจ</span>`; }
-            else if (isLate) { bg="bg-red-500/10"; st=`<span class="text-[10px] text-red-400 font-bold">เลยกำหนด</span>`; }
+            let bg = "bg-white/5"; 
+            let st = `<span class="text-[10px] text-white/30">รอส่ง</span>`;
+            let btn = ''; // 🟢 ตัวแปรสำหรับปุ่มส่งงาน
 
-            contentHTML += `<div class="flex items-center justify-between p-2 rounded-lg border border-white/5 ${bg}"><span class="text-xs text-white truncate flex-1 mr-2">${t.name}</span>${st}</div>`;
+            if (sc) { 
+                bg="bg-green-500/10"; 
+                st=`<span class="text-[10px] text-green-400 font-bold">ตรวจแล้ว (${sc.score})</span>`; 
+            } else if (submission) { 
+                bg="bg-blue-500/10"; 
+                st=`<span class="text-[10px] text-blue-300">รอตรวจ</span>`; 
+            } else {
+                // กรณีที่ยังไม่มีคะแนนและยังไม่ส่งงาน
+                if (isLate) { 
+                    bg="bg-red-500/10"; 
+                    st=`<span class="text-[10px] text-red-400 font-bold">เลยกำหนด</span>`; 
+                }
+                // 🟢 เพิ่มปุ่มส่งงานตรงนี้
+                btn = `<button onclick="window.openSubmitModal('${t.id}', '${s.id}', '${t.name}')" class="ml-2 px-3 py-1 rounded-lg bg-white/10 hover:bg-white/20 text-[10px] text-white border border-white/5 transition-all shadow-sm">ส่งงาน</button>`;
+            }
+
+            contentHTML += `<div class="flex items-center justify-between p-2 rounded-lg border border-white/5 ${bg}">
+                <span class="text-xs text-white truncate flex-1 mr-2">${t.name}</span>
+                <div class="flex items-center gap-2">${st}${btn}</div>
+            </div>`;
         });
         
         contentHTML += `</div></div></div> ${matHTML}`; 
@@ -495,4 +515,5 @@ export function refreshUI() {
 }
 
 window.refreshUI = refreshUI;
+
 
